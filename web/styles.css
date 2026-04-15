@@ -659,3 +659,49 @@ kbd {
     height: 420px;
   }
 }
+
+/* =========================================
+   MARKDOWN TABLE STYLING
+   ========================================= */
+.message-body table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+    font-size: 0.95em;
+    background-color: #ffffff;
+    border-radius: 8px;
+    overflow: hidden; 
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); 
+}
+
+.message-body th,
+.message-body td {
+    padding: 12px 15px;
+    text-align: left;
+}
+
+.message-body th {
+    background-color: #f3f4f6; 
+    color: #374151;
+    font-weight: 600;
+    border-bottom: 2px solid #d1d5db;
+    text-transform: capitalize;
+}
+
+.message-body td {
+    color: #4b5563;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.message-body tr:last-of-type td {
+    border-bottom: none;
+}
+
+.message-body tr:nth-of-type(even) {
+    background-color: #f9fafb;
+}
+
+.message-body tr:hover {
+    background-color: #f3f4f6;
+    transition: background-color 0.2s ease;
+}

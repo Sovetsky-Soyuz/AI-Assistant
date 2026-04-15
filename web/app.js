@@ -39,8 +39,8 @@ function createEmptyTurn(source = "text") {
 
 const appState = {
   mode: "simple",
-  ieltsSkill: window.localStorage.getItem("orbit_virtual_ielts_skill") || "speaking",
-  targetBand: window.localStorage.getItem("orbit_virtual_target_band") || "6.5",
+  coachTopic: window.localStorage.getItem("orbit_coach_topic") || "",
+  coachLevel: window.localStorage.getItem("orbit_coach_level") || "",
   preferredLanguage: window.localStorage.getItem("orbit_virtual_language") || "default",
   conversation: [],
   latestScreenImage: null,
@@ -77,10 +77,10 @@ const elements = {
   modeButtons: Array.from(document.querySelectorAll(".mode-button")),
   quickActions: Array.from(document.querySelectorAll(".ghost-button[data-prompt]")),
   practiceButtons: Array.from(document.querySelectorAll(".practice-button")),
-  ieltsPanel: document.getElementById("ieltsPanel"),
-  ieltsModeCopy: document.getElementById("ieltsModeCopy"),
-  ieltsSkillSelect: document.getElementById("ieltsSkillSelect"),
-  targetBandInput: document.getElementById("targetBandInput"),
+  coachPanel: document.getElementById("coachPanel"), 
+  coachTopicInput: document.getElementById("coachTopicInput"), 
+  coachLevelInput: document.getElementById("coachLevelInput"), 
+  coachModeCopy: document.getElementById("coachModeCopy"), 
   stageStatus: document.getElementById("stageStatus"),
   stageCopy: document.getElementById("stageCopy"),
   avatarStage: document.getElementById("avatarStage"),
@@ -112,41 +112,77 @@ const elements = {
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
-  populateLanguageSelects();
+  // populateLanguageSelects();
+  initializeFormValues();
   bindEvents();
   initAvatarWorker();
   refreshTodayLabel();
+  setInterval(refreshTodayLabel, 60000);
   updateModeUI();
   setupSpeechRecognition();
   setStageState("idle", "Idle and ready.", "A lighter Assistant shell is running locally in your browser.");
   addMessage(
     "system",
-    "Orbit Virtual Assistant is ready. You can type, Unmute the mic to talk, share your screen for context, or switch into IELTS coach mode."
+    "Orbit Virtual Assistant is ready. You can type, Hold button or Control to talk, share your screen for context, or switch into Coach mode."
   );
   await refreshState();
 });
 
-function populateLanguageSelects() {
+// function populateLanguageSelects() {
+//   const voiceValue = window.localStorage.getItem("orbit_voice_language") || "default";
+//   elements.voiceLanguageSelect.innerHTML = "";
+//   elements.conversationLanguageSelect.innerHTML = "";
+
+//   VOICE_LANGUAGE_OPTIONS.forEach((option) => {
+//     const voiceNode = document.createElement("option");
+//     voiceNode.value = option.value;
+//     voiceNode.textContent = option.label;
+//     voiceNode.selected = option.value === voiceValue;
+//     elements.voiceLanguageSelect.appendChild(voiceNode);
+
+//     const conversationNode = document.createElement("option");
+//     conversationNode.value = option.value;
+//     conversationNode.textContent = option.label;
+//     conversationNode.selected = option.value === appState.preferredLanguage;
+//     elements.conversationLanguageSelect.appendChild(conversationNode);
+//   });
+
+//   elements.ieltsSkillSelect.value = appState.coachTopic;
+//   elements.targetBandInput.value = appState.coachLevel;
+// }
+
+
+function initializeFormValues() {
   const voiceValue = window.localStorage.getItem("orbit_voice_language") || "default";
-  elements.voiceLanguageSelect.innerHTML = "";
-  elements.conversationLanguageSelect.innerHTML = "";
+  
+  if (elements.voiceLanguageSelect) elements.voiceLanguageSelect.innerHTML = "";
+  if (elements.conversationLanguageSelect) elements.conversationLanguageSelect.innerHTML = "";
 
   VOICE_LANGUAGE_OPTIONS.forEach((option) => {
-    const voiceNode = document.createElement("option");
-    voiceNode.value = option.value;
-    voiceNode.textContent = option.label;
-    voiceNode.selected = option.value === voiceValue;
-    elements.voiceLanguageSelect.appendChild(voiceNode);
+    if (elements.voiceLanguageSelect) {
+        const voiceNode = document.createElement("option");
+        voiceNode.value = option.value;
+        voiceNode.textContent = option.label;
+        voiceNode.selected = option.value === voiceValue;
+        elements.voiceLanguageSelect.appendChild(voiceNode);
+    }
 
-    const conversationNode = document.createElement("option");
-    conversationNode.value = option.value;
-    conversationNode.textContent = option.label;
-    conversationNode.selected = option.value === appState.preferredLanguage;
-    elements.conversationLanguageSelect.appendChild(conversationNode);
+    if (elements.conversationLanguageSelect) {
+        const conversationNode = document.createElement("option");
+        conversationNode.value = option.value;
+        conversationNode.textContent = option.label;
+        conversationNode.selected = option.value === appState.preferredLanguage;
+        elements.conversationLanguageSelect.appendChild(conversationNode);
+    }
   });
 
-  elements.ieltsSkillSelect.value = appState.ieltsSkill;
-  elements.targetBandInput.value = appState.targetBand;
+  
+  if (elements.coachTopicInput) {
+      elements.coachTopicInput.value = appState.coachTopic;
+  }
+  if (elements.coachLevelInput) {
+      elements.coachLevelInput.value = appState.coachLevel;
+  }
 }
 
 function bindEvents() {
@@ -173,28 +209,29 @@ function bindEvents() {
     });
   });
 
-  elements.ieltsSkillSelect.addEventListener("change", () => {
-    appState.ieltsSkill = elements.ieltsSkillSelect.value;
-    window.localStorage.setItem("orbit_virtual_ielts_skill", appState.ieltsSkill);
-    updateModeUI();
+  elements.coachTopicInput.addEventListener("input", () => {
+    appState.coachTopic = elements.coachTopicInput.value.trim();
+    window.localStorage.setItem("orbit_coach_topic", appState.coachTopic);
   });
 
-  elements.targetBandInput.addEventListener("change", () => {
-    appState.targetBand = elements.targetBandInput.value.trim() || "6.5";
-    elements.targetBandInput.value = appState.targetBand;
-    window.localStorage.setItem("orbit_virtual_target_band", appState.targetBand);
+  elements.coachLevelInput.addEventListener("input", () => {
+    appState.coachLevel = elements.coachLevelInput.value.trim() || "Beginner";
+    window.localStorage.setItem("orbit_coach_level", appState.coachLevel);
   });
 
-  /// Hold-to-talk voice capture is currently disabled to avoid conflicts with spacebar hotkey and to simplify the experience, but the handlers are left here for easy re-enabling in the future if desired.
+  // --- Push-to-Talk Logic ---
   
-  // elements.micButton.addEventListener("pointerdown", handleMicPointerDown);
-  // window.addEventListener("pointerup", handleMicPointerUp);
-  // window.addEventListener("pointercancel", handleMicPointerUp);
-  // window.addEventListener("keydown", handleHotkeyDown);
-  // window.addEventListener("keyup", handleHotkeyUp);
+  elements.micButton.addEventListener("pointerdown", handleMicPointerDown);
+  window.addEventListener("pointerup", handleMicPointerUp);
+  window.addEventListener("pointercancel", handleMicPointerUp);
 
-  elements.micButton.addEventListener("click", toggleVoiceCapture);
-  window.addEventListener("keydown", handleToggleHotkey);
+  // Use the Alt key for Push-to-Talk using the keyboard.
+
+  window.addEventListener("keydown", handleHotkeyDown);
+  window.addEventListener("keyup", handleHotkeyUp);
+
+  // elements.micButton.addEventListener("click", toggleVoiceCapture);
+  // window.addEventListener("keydown", handleToggleHotkey);
 
   elements.composer.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -213,17 +250,27 @@ function bindEvents() {
         addMessage("system", "Start screen sharing first so Orbit can use your current screen as context.");
         return;
       }
-      if ((button.dataset.prompt || "").includes("IELTS Speaking")) {
-        setMode("ielts", "speaking");
+      
+      let finalPrompt = button.dataset.prompt || "";
+      
+      if (finalPrompt.includes("RAG") || finalPrompt.includes("local papers")) {
+          const topic = elements.coachTopicInput ? elements.coachTopicInput.value : appState.coachTopic;
+          finalPrompt = `${finalPrompt} The topic is: ${topic}. YOU MUST call the search_local_docs tool first.`;
       }
-      await sendPrompt(button.dataset.prompt || "", { forceScreen: needsScreen });
+
+      await sendPrompt(finalPrompt, { forceScreen: needsScreen });
     });
   });
 
   elements.practiceButtons.forEach((button) => {
     button.addEventListener("click", async () => {
-      setMode("ielts", button.dataset.ieltsSkill || "speaking");
-      await sendPrompt(button.dataset.prompt || "");
+      setMode("coach"); 
+      
+      const currentTopic = elements.coachTopicInput ? elements.coachTopicInput.value : appState.coachTopic;
+      
+      let finalPrompt = `${button.dataset.prompt} The subject is: ${currentTopic}. YOU MUST use the 'search_local_docs' tool to retrieve context before generating the response.`;
+      
+      await sendPrompt(finalPrompt);
     });
   });
 
@@ -289,14 +336,18 @@ function refreshTodayLabel() {
 
 function updateModeUI() {
   elements.modeButtons.forEach((button) => button.classList.toggle("active", button.dataset.mode === appState.mode));
-  elements.ieltsPanel.classList.toggle("hidden", appState.mode !== "ielts");
-  elements.ieltsModeCopy.textContent = IELTS_MODE_COPY[appState.ieltsSkill] || IELTS_MODE_COPY.speaking;
+  elements.coachPanel.classList.toggle("hidden", appState.mode !== "coach");
+  if (appState.mode === "coach") {
+      elements.coachModeCopy.textContent = "Orbit will act as a personal tutor. For best results, enable RAG mode to use your local documents as the textbook.";
+  }
 }
 
-function setMode(mode, ieltsSkill = appState.ieltsSkill) {
+function setMode(mode, coachTopic = appState.coachTopic) {
   appState.mode = mode;
-  appState.ieltsSkill = ieltsSkill;
-  elements.ieltsSkillSelect.value = appState.ieltsSkill;
+  appState.coachTopic = coachTopic;
+  if (elements.coachTopicInput) {
+      elements.coachTopicInput.value = appState.coachTopic || "";
+  }
   updateModeUI();
 }
 
@@ -325,7 +376,7 @@ function setupSpeechRecognition() {
     setStageState("listening", "Listening for your voice.", "Orbit is capturing speech and will turn it into the next chat bubble.");
     setVoiceStatus(`Listening in ${getSelectedLanguageLabel(elements.voiceLanguageSelect.value)}...`);
 
-    resetSilenceTimer();
+    // resetSilenceTimer();
 
     if (appState.stopRecognitionAfterStart) {
       recognition.stop();
@@ -346,11 +397,11 @@ function setupSpeechRecognition() {
     appState.currentTurn.userNode.querySelector(".message-meta").textContent = "Voice transcript";
     setVoiceStatus("Capturing speech...");
 
-    resetSilenceTimer();
+    // resetSilenceTimer();
   };
 
   recognition.onerror = (event) => {
-    clearSilenceTimer();
+    // clearSilenceTimer();
     appState.recognitionStarting = false;
     appState.listening = false;
     appState.stopRecognitionAfterStart = false;
@@ -364,7 +415,7 @@ function setupSpeechRecognition() {
   };
 
   recognition.onend = async () => {
-    clearSilenceTimer();
+    // clearSilenceTimer();
     const transcript = appState.liveVoiceTranscript.trim();
     appState.recognitionStarting = false;
     appState.listening = false;
@@ -404,6 +455,11 @@ async function refreshState() {
   const data = await response.json();
 
   appState.memory = data.memory;
+
+  if (data.history && data.history.length > 0) {
+    appState.conversation = data.history; 
+  }
+  
   appState.liveVoiceName = data.liveVoiceName || "Kore";
   const provider = data.provider || "Gemini";
   elements.apiStatus.textContent = data.hasApiKey ? `${provider} key detected` : "Add API_KEY to enable chat";
@@ -421,11 +477,14 @@ async function sendPrompt(prompt, options = {}) {
   if (appState.currentTurn && appState.currentTurn.assistantNode) {
     return; 
   }
+
   const attachScreen = options.forceScreen || elements.attachScreenToggle.checked;
   const screenImage = attachScreen ? appState.latestScreenImage : null;
   const priorConversation = [...appState.conversation];
-  const shouldSpeakReply = appState.voiceEnabled || options.fromVoice === true;
+  // const shouldSpeakReply = appState.voiceEnabled || options.fromVoice === true;
+  const shouldSpeakReply = appState.voiceEnabled;
   const turn = options.voiceTurn || createEmptyTurn(options.fromVoice ? "voice" : "text");
+  
   turn.inputText = prompt;
 
   if (!turn.userNode) {
@@ -442,11 +501,10 @@ async function sendPrompt(prompt, options = {}) {
 
   turn.assistantNode = turn.assistantNode || addMessage("assistant", "Thinking...", "Orbit");
   turn.assistantNode.querySelector(".message-body").textContent = "Thinking...";
-  turn.assistantNode.querySelector(".message-meta").textContent = "Orbit";
   appState.currentTurn = turn;
 
   setComposerState(true);
-  setStageState("thinking", "Thinking through your request.", "Orbit is combining memory, tools, and your latest screen or voice context.");
+  setStageState("thinking", "Thinking...", "Orbit is processing your request.");
 
   try {
     const response = await fetch("/api/chat", {
@@ -457,11 +515,12 @@ async function sendPrompt(prompt, options = {}) {
         conversation: priorConversation,
         screenImage,
         mode: appState.mode,
-        ieltsSkill: appState.ieltsSkill,
-        targetBand: appState.targetBand,
+        coachTopic: appState.coachTopic,
+        coachLevel: appState.coachLevel,
         preferredLanguage: appState.preferredLanguage,
       }),
     });
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -469,67 +528,59 @@ async function sendPrompt(prompt, options = {}) {
     }
 
     turn.outputText = data.reply;
-    turn.assistantNode.querySelector(".message-body").textContent = data.reply;
-    // turn.assistantNode.querySelector(".message-meta").textContent = data.model || "";
-    turn.assistantNode.querySelector(".message-meta").textContent = "Orbit";
 
-    if (!turn.assistantStored) {
-      appState.conversation.push({ role: "assistant", text: data.reply });
-      turn.assistantStored = true;
+    if (typeof marked !== "undefined") {
+      turn.assistantNode.querySelector(".message-body").innerHTML = marked.parse(data.reply);
+      formatLinks(turn.assistantNode.querySelector(".message-body"));
+    } else {
+      turn.assistantNode.querySelector(".message-body").textContent = data.reply;
     }
+    
+    const isRefusal = data.reply.includes("safety and moderation guidelines");
+    if (isRefusal) {
+      appState.conversation.pop(); 
+    } else {
+      appState.conversation.push({ role: "assistant", text: data.reply });
+      
+      fetch("/api/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(appState.conversation)
+      }).catch(err => console.error("History sync error:", err));
+    }
+
     appState.memory = data.memory;
     appState.recentToolEvents = data.toolEvents || [];
     refreshMemoryViews();
     renderToolEvents(appState.recentToolEvents);
-    setStageState("speaking", "Orbit is replying.", "This simple virtual shell uses browser speech and a worker-driven stage while the model reply stays visible in chat.");
+    setStageState("speaking", "Orbit is replying.", "Model reply is visible in chat.");
 
     if (shouldSpeakReply && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(data.reply);
-
-      // const voices = window.speechSynthesis.getVoices();
-      // // const targetVoiceName = process.env.LIVE_VOICE_NAME || "Kore";
-      // const targetVoiceName = appState.liveVoiceName;
-      // const selectedVoice = voices.find((voice) => voice.name.includes(targetVoiceName));
-
-      // if (selectedVoice) {
-      //   utterance.voice = selectedVoice;
-      // }
-
       const voices = window.speechSynthesis.getVoices();
-      const targetVoiceName = appState.liveVoiceName;
-      
-      const selectedVoice = voices.find((voice) => 
-        voice.name.toLowerCase().includes(targetVoiceName.toLowerCase())
-      );
-
+      const selectedVoice = voices.find(v => v.name.toLowerCase().includes(appState.liveVoiceName.toLowerCase()));
       if (selectedVoice) {
         utterance.voice = selectedVoice;
         utterance.lang = selectedVoice.lang; 
       }
-
-      utterance.onend = () => {
-        setStageState("idle", "Idle and ready.", "Orbit is waiting for your next question.");
-        //
-        if (options.fromVoice) {
-          void startVoiceCapture();
-        }
-      };
+      utterance.onend = () => setStageState("idle", "Idle and ready.");
       window.speechSynthesis.speak(utterance);
     } else {
-      window.setTimeout(() => {
-        setStageState("idle", "Idle and ready.", "Orbit is waiting for your next question.");
-        
-        if (options.fromVoice) {
-            void startVoiceCapture();
-        }
-
-      }, 320);
+      window.setTimeout(() => setStageState("idle", "Idle and ready."), 320);
     }
+
   } catch (error) {
-    turn.assistantNode.querySelector(".message-body").textContent = error.message;
+    const errorMessage = error.message.includes("image input") 
+      ? "I'm sorry, the current AI model doesn't support image analysis. Please try text-only or switch models."
+      : `Error: ${error.message}`;
+
+    turn.assistantNode.querySelector(".message-body").textContent = errorMessage;
     turn.assistantNode.classList.add("system");
-    setStageState("idle", "Idle and ready.", "Orbit hit an error and is waiting for another try.");
+
+    appState.conversation.pop(); 
+    setStageState("idle", "Error occurred.");
+    
   } finally {
     appState.currentTurn = null;
     setComposerState(false);
@@ -555,7 +606,13 @@ function addMessage(role, text, meta = "") {
 
   const body = document.createElement("div");
   body.className = "message-body";
-  body.textContent = text;
+
+  if (role === "assistant" && typeof marked !== "undefined") {
+    body.innerHTML = marked.parse(text);
+    formatLinks(body);
+  } else {
+    body.textContent = text;
+  }
 
   const footer = document.createElement("div");
   footer.className = "message-meta";
@@ -878,29 +935,77 @@ function captureScreenFrame() {
 // }
 
 
-function toggleVoiceCapture() {
-  if (!appState.speechSupported) return;
+// function toggleVoiceCapture() {
+//   if (!appState.speechSupported) return;
 
-  if (appState.listening || appState.recognitionStarting) {
-    stopVoiceCapture();
-  } else {
-    void startVoiceCapture();
-  }
+//   if (appState.listening || appState.recognitionStarting) {
+//     stopVoiceCapture();
+//   } else {
+//     void startVoiceCapture();
+//   }
+// }
+
+// function handleToggleHotkey(event) {
+//   if (event.key.toLowerCase() !== "m" || event.repeat || shouldIgnoreHotkey()) {
+//     return;
+//   }
+//   event.preventDefault();
+//   toggleVoiceCapture();
+// }
+
+// --- Xử lý click chuột ---
+function handleMicPointerDown(event) {
+  if (event.button !== 0) return; // Chỉ nhận click chuột trái
+  appState.micHeld = true;
+  void startVoiceCapture();
 }
 
-function handleToggleHotkey(event) {
-  if (event.key.toLowerCase() !== "m" || event.repeat || shouldIgnoreHotkey()) {
+function handleMicPointerUp() {
+  if (!appState.micHeld) return;
+  appState.micHeld = false;
+  stopVoiceCapture();
+}
+
+function handleHotkeyDown(event) {
+  if (event.key !== "Control" || event.repeat || shouldIgnoreHotkey()) {
     return;
   }
-  event.preventDefault();
-  toggleVoiceCapture();
+  // event.preventDefault();
+  appState.hotkeyDown = true;
+  appState.spaceTalking = true;
+  void startVoiceCapture();
 }
+
+function handleHotkeyUp(event) {
+  if (event.key === "Control" && appState.hotkeyDown) {
+    appState.hotkeyDown = false;
+    appState.spaceTalking = false;
+    stopVoiceCapture();
+  }
+}
+
+// function handleHotkeyUp(event) {
+//   if (event.key !== "Control" || !appState.hotkeyDown) {
+//     return;
+//   }
+//   event.preventDefault();
+//   appState.hotkeyDown = false;
+//   appState.spaceTalking = false;
+//   stopVoiceCapture();
+// }
+
+window.addEventListener("blur", () => {
+  if (appState.hotkeyDown || appState.micHeld) {
+    appState.hotkeyDown = false;
+    appState.micHeld = false;
+    appState.spaceTalking = false;
+    stopVoiceCapture();
+  }
+});
 
 function shouldIgnoreHotkey() {
   const activeElement = document.activeElement;
-  if (!activeElement) {
-    return false;
-  }
+  if (!activeElement) return false;
   return ["INPUT", "TEXTAREA", "SELECT"].includes(activeElement.tagName) || activeElement.isContentEditable;
 }
 
@@ -967,11 +1072,11 @@ function updateMicButton() {
 
   elements.micButton.disabled = false;
   if (appState.listening || appState.recognitionStarting) {
-    elements.micButton.textContent = "Mute (Listening...)"; 
+    elements.micButton.textContent = "Release to Send"; 
     elements.micButton.classList.add("active"); 
     return;
   }
-  elements.micButton.textContent = "Unmute (Press M)";
+  elements.micButton.textContent = "Hold to Talk (Ctr)";
   elements.micButton.classList.remove("active");
 }
 
@@ -1013,40 +1118,28 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-
-function resetSilenceTimer() {
-  clearSilenceTimer();
-  appState.silenceTimeoutId = window.setTimeout(() => {
-    if (appState.listening) {
-      setVoiceStatus("Auto-stopped after 2s of silence.");
-      stopVoiceCapture();
-    }
-  }, 2000); 
+function formatLinks(container) {
+  if (!container) return;
+  const links = container.querySelectorAll("a");
+  links.forEach(link => {
+    link.setAttribute("target", "_blank");
+    link.setAttribute("rel", "noopener noreferrer");
+  });
 }
 
-function clearSilenceTimer() {
-  if (appState.silenceTimeoutId) {
-    window.clearTimeout(appState.silenceTimeoutId);
-    appState.silenceTimeoutId = null;
-  }
-}
-
-// function setStage(state, text) {
-//   avatar.setState(state);
-
-//   document.getElementById("stageStatus").textContent = text;
+// function resetSilenceTimer() {
+//   clearSilenceTimer();
+//   appState.silenceTimeoutId = window.setTimeout(() => {
+//     if (appState.listening) {
+//       setVoiceStatus("Auto-stopped after 2s of silence.");
+//       stopVoiceCapture();
+//     }
+//   }, 2000); 
 // }
 
-// micButton.addEventListener("mousedown", () => {
-//   avatar.setState("listening");
-// });
-
-// micButton.addEventListener("mouseup", () => {
-//   avatar.setState("thinking");
-// });
-
-// avatar.setState("speaking");
-
-// speechSynthesis.onend = () => {
-//   avatar.setState("idle");
-// };
+// function clearSilenceTimer() {
+//   if (appState.silenceTimeoutId) {
+//     window.clearTimeout(appState.silenceTimeoutId);
+//     appState.silenceTimeoutId = null;
+//   }
+// }

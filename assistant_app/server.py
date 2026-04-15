@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import os
+import dataclasses
 import json
 import mimetypes
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from os import path
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -15,6 +18,7 @@ from .memory_store import MemoryStore
 from .news import NewsError, NewsService
 from .weather import WeatherError, WeatherService
 from .knowledge import KnowledgeService
+from .web_search import WebSearchService
 
 
 class AssistantApplication:
@@ -28,8 +32,10 @@ class AssistantApplication:
         else:
                 self.knowledge = None
 
+        self.web_search = WebSearchService()
+
         # self.knowledge = KnowledgeService(str(settings.root_dir / "Knowledge"))
-        self.assistant = LLMAssistant(settings, self.memory_store, self.knowledge)
+        self.assistant = LLMAssistant(settings, self.memory_store, self.knowledge, self.web_search)
         # self.assistant = GeminiAssistant(settings, self.memory_store)
         # self.assistant = LLMAssistant(settings, self.memory_store)
         self.weather = WeatherService(settings.default_location)
@@ -95,12 +101,28 @@ class AssistantApplication:
             except NewsError as exc:
                 self._send_json(handler, {"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
             return
+        
 
         self._send_json(handler, {"error": "Not found."}, status=HTTPStatus.NOT_FOUND)
 
     def handle_post(self, handler: BaseHTTPRequestHandler) -> None:
         parsed = urlparse(handler.path)
         payload = self._read_json(handler)
+
+        if parsed.path == "/api/history":
+            content_length = int(handler.headers.get("Content-Length", "0"))
+            raw_body = handler.rfile.read(content_length).decode("utf-8") if content_length else "[]"
+            
+            try:
+                payload = json.loads(raw_body)
+                if not isinstance(payload, list):
+                     payload = []
+            except json.JSONDecodeError:
+                payload = []
+
+            self.memory_store.update_history(payload)
+            self._send_json(handler, {"status": "success"})
+            return
 
         if parsed.path == "/api/chat":
             self._handle_chat(handler, payload)
@@ -148,8 +170,8 @@ class AssistantApplication:
                 conversation=payload.get("conversation") or [],
                 screen_image=payload.get("screenImage"),
                 mode=(payload.get("mode") or "simple").strip().lower(),
-                ielts_skill=(payload.get("ieltsSkill") or "speaking").strip().lower(),
-                target_band=(payload.get("targetBand") or "6.5").strip() or "6.5",
+                coach_topic=(payload.get("coachTopic") or "General Learning").strip(), 
+                coach_level=(payload.get("coachLevel") or "Beginner").strip(),         
                 preferred_language=(payload.get("preferredLanguage") or "default").strip() or "default",
             )
         # except GeminiClientError as exc:
@@ -180,14 +202,48 @@ class AssistantApplication:
     #         "memory": self.memory_store.get_state(),
     #     }
 
+    # def _state_payload(self) -> dict[str, Any]:
+    #     state = self.memory_store.get_state()
+    #     history_path = self.settings.data_dir / "chat_history.json"
+
+    #     history = []
+    #     if history_path.exists():
+    #         with open(history_path, "r", encoding="utf-8") as f:
+    #             history = json.load(f)
+
+    #     return {
+    #         "provider": self.settings.provider_name,
+    #         "hasApiKey": bool(self.settings.current_api_key),
+    #         "model": self.settings.ai_model,
+    #         "defaultLocation": self.settings.default_location,
+    #         "liveVoiceName": self.settings.live_voice_name,
+    #         "memory": self.memory_store.get_state(),
+    #         "history": history,
+    #     }
+
     def _state_payload(self) -> dict[str, Any]:
+        state = self.memory_store.get_state()
+        history_path = self.settings.data_dir / "chat_history.json"
+        
+        history = []
+        if history_path.exists():
+            try:
+                # Kiểm tra nếu file có dung lượng > 0 mới đọc
+                if history_path.stat().st_size > 0:
+                    with open(history_path, "r", encoding="utf-8") as f:
+                        history = json.load(f)
+            except (json.JSONDecodeError, Exception) as e:
+                print(f"[⚠️] Warning: Could not read chat_history.json ({e}). Resetting history.")
+                history = []
+
         return {
             "provider": self.settings.provider_name,
             "hasApiKey": bool(self.settings.current_api_key),
             "model": self.settings.ai_model,
             "defaultLocation": self.settings.default_location,
             "liveVoiceName": self.settings.live_voice_name,
-            "memory": self.memory_store.get_state(),
+            "memory": state,
+            "history": history,
         }
 
     def _serve_file(self, handler: BaseHTTPRequestHandler, file_path: Path) -> None:
@@ -232,19 +288,42 @@ def run() -> None:
     print("      ORBIT VIRTUAL ASSISTANT")
     print("==================================================")
 
+    print(f"Current default provider in .env: {settings.provider_name.upper()}")
+    print("Select AI Provider:")
+    print("  1: Google (Gemini)")
+    print("  2: OpenRouter")
+    print("  3: LM Studio (Local)")
+    print("  4: Ollama (Local)")
+    p_choice = input("Choice [Press Enter for default]: ").strip()
+
+    if p_choice == "1":
+        settings = dataclasses.replace(settings, active_provider="google", ai_model=os.getenv("GOOGLE_MODEL", "gemini-2.5-flash"))
+    elif p_choice == "2":
+        settings = dataclasses.replace(settings, active_provider="openrouter", ai_model=os.getenv("OPENROUTER_MODEL", settings.ai_model))
+    elif p_choice == "3":
+        settings = dataclasses.replace(settings, active_provider="lm_studio", ai_model=os.getenv("LM_STUDIO_MODEL", "local-model"))
+    elif p_choice == "4":
+        settings = dataclasses.replace(settings, active_provider="ollama", ai_model=os.getenv("OLLAMA_MODEL", "llama3.1"))
+
+    print(f"--- Running with Provider: {settings.active_provider.upper()} ({settings.ai_model}) ---")
+
     use_rag = input("Do you want to enable RAG with local documents (RAG via LM Studio)? (y/n) [n]: ").strip().lower()
 
     rag_path = None
     if use_rag in ['y', 'yes']:
-        default_path = str(settings.root_dir / "Knowledge")
+        # default_path = str(settings.root_dir / "Knowledge")
+        default_path = settings.rag_docs_path or str(settings.root_dir / "Knowledge")
+        
         user_path = input(f"Enter the path to your local documents (default: {default_path}): ").strip()
+        
         rag_path = user_path if user_path else default_path
+
         print(f"Connecting to LM Studio and initializing the Vector Database....")
         print(f"RAG will be enabled with documents from: {rag_path}")
     else:
         print("RAG will be disabled. The assistant will not have access to local documents.")
 
-    app = AssistantApplication(settings)
+    app = AssistantApplication(settings, rag_path)
     server = ThreadingHTTPServer(("127.0.0.1", settings.assistant_port), app.handler())
     print(f"Orbit Assistant is running on http://127.0.0.1:{settings.assistant_port}")
     server.serve_forever()

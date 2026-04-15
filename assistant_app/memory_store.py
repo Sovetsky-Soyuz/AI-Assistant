@@ -21,6 +21,7 @@ DEFAULT_STATE: dict[str, Any] = {
         "notes": [],
     },
     "tasks": [],
+    "history": [],
     "last_weather": None,
     "last_news": None,
     "activity": [],
@@ -175,3 +176,9 @@ class MemoryStore:
             }
         )
         state["activity"] = state["activity"][-20:]
+
+    def update_history(self, chat_history: list[dict[str, str]]) -> None:
+        history_path = self.path.parent / "chat_history.json"
+        with self._lock:
+            with open(history_path, "w", encoding="utf-8") as f:
+                json.dump(chat_history, f, indent=2, ensure_ascii=False)

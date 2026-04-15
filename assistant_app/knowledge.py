@@ -7,6 +7,39 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.retrievers import BM25Retriever
 from langchain_classic.retrievers import EnsembleRetriever
 
+import sys
+import time
+import threading
+
+class SpinnerTimer:
+    def __init__(self, message="Processing"):
+        self.message = message
+        self.is_running = False
+        self._thread = None
+        self.start_time = 0
+
+    def _spin(self) -> None:
+        while self.is_running:
+            elapsed = time.time() - self.start_time
+            sys.stdout.write(f"\r[⏳] {self.message}... ({elapsed:.1f}s)")
+            sys.stdout.flush()
+            time.sleep(0.1) 
+
+    def start(self) -> None:
+        self.is_running = True
+        self.start_time = time.time()
+        self._thread = threading.Thread(target=self._spin)
+        self._thread.start()
+
+    def stop(self) -> float:
+        self.is_running = False
+        if self._thread:
+            self._thread.join()
+
+        sys.stdout.write("\r" + " " * 80 + "\r")
+        sys.stdout.flush()
+        return time.time() - self.start_time
+
 class KnowledgeService:
     def __init__(self, docs_dir: str = "./Papers"):
         self.docs_dir = docs_dir
@@ -83,19 +116,32 @@ class KnowledgeService:
         print("Orbit Local Knowledge Base is ready!")
 
     def search(self, query: str) -> dict:
-        """Orbit sẽ gọi hàm này khi cần tìm tài liệu local"""
         if not self.retriever:
             return {"error": "Knowledge base is empty. Please add files to ./Papers and restart."}
 
+        print(f"\n[📚] Orbit is scanning local documents for: '{query}'...")
+
+        timer = SpinnerTimer(message="Reading and ranking chunks")
+        timer.start()
+
         try:
             docs = self.retriever.invoke(query)
+
+            elapsed_time = timer.stop()
+
             if not docs:
+                print(f"[📚] Local Search: No relevant info found. ({elapsed_time:.1f}s)")
                 return {"result": "No relevant local information found."}
             
-            # Đóng gói kết quả gửi lại cho Orbit đọc hiểu
+            print(f"[📚] Local Search: Successfully retrieved {len(docs)} chunks! ({elapsed_time:.1f}s)")
+            
             context = "\n\n---\n\n".join(
                 [f"[Source: {doc.metadata.get('source', 'Unknown')}]\n{doc.page_content}" for doc in docs]
             )
+
             return {"result": context}
+        
         except Exception as e:
+            timer.stop()
+            print(f"[⚠️] Local Search failed: {e}")
             return {"error": str(e)}

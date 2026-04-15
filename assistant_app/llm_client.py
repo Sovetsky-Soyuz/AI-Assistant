@@ -14,7 +14,7 @@ from .news import NewsService
 from .orbit_brain import (
     build_rest_tools,
     build_system_instruction,
-    normalize_ielts_skill,
+    # normalize_ielts_skill,
     normalize_mode,
     run_tool_call,
 )
@@ -37,12 +37,13 @@ class LLMClientError(RuntimeError):
 
 
 class LLMAssistant:
-    def __init__(self, settings: Settings, memory_store: MemoryStore, knowledge_service: Any) -> None:
+    def __init__(self, settings: Settings, memory_store: MemoryStore, knowledge_service: Any, web_search_service: Any) -> None:
         self.settings = settings
         self.memory_store = memory_store
         self.weather_service = WeatherService(settings.default_location)
         self.news_service = NewsService()
         self.knowledge_service = knowledge_service
+        self.web_search_service = web_search_service
 
     def chat(
         self,
@@ -50,8 +51,8 @@ class LLMAssistant:
         conversation: list[dict[str, str]] | None = None,
         screen_image: str | None = None,
         mode: str = "simple",
-        ielts_skill: str = "speaking",
-        target_band: str = "6.5",
+        coach_topic: str = "General Learning", 
+        coach_level: str = "Beginner",         
         preferred_language: str = "default",
     ) -> AssistantResult:
         if not self.settings.current_api_key:
@@ -60,21 +61,27 @@ class LLMAssistant:
         instructions = build_system_instruction(
             self.memory_store,
             normalize_mode(mode),
-            ielts_skill=normalize_ielts_skill(ielts_skill),
-            target_band=target_band,
+            coach_topic=coach_topic,         
+            coach_level=coach_level,         
             preferred_language=preferred_language,
             recent_conversation=conversation or [],
         )
 
-        if self.settings.active_provider == "openrouter":
+        if self.settings.active_provider in ["openrouter", "lm_studio", "ollama"]:
             return self._chat_openrouter(message, conversation or [], screen_image, instructions)
         else:
             return self._chat_google(message, conversation or [], screen_image, instructions)
-
+        
     # ==========================================
     #  OPENROUTER (OPENAI-COMPATIBLE) LOGIC
     # ==========================================
     def _chat_openrouter(self, message: str, conversation: list[dict[str, str]], screen_image: str | None, instructions: str) -> AssistantResult:
+        
+        trigger_phrases = ["do you know", "who is", "what is", "tell me about", "give me information on", "details about"]
+        lower_msg = message.lower()
+        if any(phrase in lower_msg for phrase in trigger_phrases):
+            message = f"{message}\n\n[System Note: This looks like a factual query. You MUST use the `search_web` tool to find the latest info before answering.]"
+
         messages: list[dict[str, Any]] = [{"role": "system", "content": instructions}]
 
         for entry in conversation[-12:]:
@@ -90,28 +97,47 @@ class LLMAssistant:
         current_content.append({"type": "text", "text": message.strip()})
         messages.append({"role": "user", "content": current_content})
 
-        # google_tools = build_rest_tools()
         google_tools = build_rest_tools(enable_knowledge=self.knowledge_service is not None)
         tools = [{"type": "function", "function": f} for f in google_tools[0]["functionDeclarations"]]
         tool_events: list[dict[str, Any]] = []
 
-        for _ in range(6):
+        if messages and messages[-1]["role"] == "user":
+             multi_tool_reminder = (
+                 "\n\n[SYSTEM INSTRUCTION: Analyze the user's request carefully. If the prompt contains multiple distinct requests (e.g., asking about one topic on the web AND another topic in local files), you MUST execute MULTIPLE tool calls in parallel or sequence before generating your final text response. Do not skip any part of the query. Only answer after ALL relevant tools have returned data.]"
+             )
+
+             for part in messages[-1]["content"]:
+                 if part.get("type") == "text":
+                     part["text"] += multi_tool_reminder
+                     break
+
+        for _ in range(100):
             payload = {
                 "model": self.settings.ai_model,
                 "messages": messages,
                 "tools": tools,
-                "temperature": 0.7,
+                "temperature": 0.5,
             }
-                
-            request = Request(
-                API_URL_OPENROUTER,
-                data=json.dumps(payload).encode("utf-8"),
-                headers={
+
+            if self.settings.active_provider == "lm_studio":
+                endpoint = f"{self.settings.lm_studio_url.rstrip('/')}/chat/completions"
+                headers = {"Content-Type": "application/json"}
+            elif self.settings.active_provider == "ollama":
+                endpoint = f"{self.settings.ollama_url.rstrip('/')}/v1/chat/completions"
+                headers = {"Content-Type": "application/json"}
+            else: # OpenRouter
+                endpoint = API_URL_OPENROUTER
+                headers = {
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {self.settings.current_api_key}",
                     "HTTP-Referer": "http://127.0.0.1",
                     "X-Title": "Orbit Assistant"
-                },
+                }
+                
+            request = Request(
+                endpoint,
+                data=json.dumps(payload).encode("utf-8"),
+                headers=headers,
                 method="POST",
             )
 
@@ -120,6 +146,15 @@ class LLMAssistant:
                     res_data = json.loads(response.read().decode("utf-8"))
             except HTTPError as exc:
                 details = exc.read().decode("utf-8", errors="ignore")
+
+                if exc.code == 403 and ("moderation" in details.lower() or "flagged" in details.lower()):
+
+                    return AssistantResult(
+                        reply="I'm sorry, but I cannot fulfill this request as it goes against my safety and moderation guidelines.",
+                        tool_events=tool_events
+                    )
+
+                    
                 raise LLMClientError(f"OpenRouter error ({exc.code}): {details}") from exc
             except URLError as exc:
                 raise LLMClientError(f"Unable to reach OpenRouter: {exc.reason}") from exc
@@ -148,6 +183,7 @@ class LLMAssistant:
                     self.weather_service,
                     self.news_service,
                     self.knowledge_service,
+                    self.web_search_service,
                     name=name,
                     arguments=args,
                     call_id=call_id,
@@ -170,7 +206,16 @@ class LLMAssistant:
         contents = self._build_google_contents(message, conversation, screen_image)
         tool_events: list[dict[str, Any]] = []
 
-        for _ in range(6):
+        if contents and contents[-1]["role"] == "user":
+            multi_tool_reminder = (
+                 "\n\n[SYSTEM INSTRUCTION: Analyze the user's request carefully. If the prompt contains multiple distinct requests (e.g., asking about one topic on the web AND another topic in local files), you MUST execute MULTIPLE tool calls in parallel or sequence before generating your final text response. Do not skip any part of the query. Only answer after ALL relevant tools have returned data.]"
+            )
+
+            if "parts" in contents[-1] and len(contents[-1]["parts"]) > 0:
+                if "text" in contents[-1]["parts"][0]:
+                    contents[-1]["parts"][0]["text"] += multi_tool_reminder
+
+        for _ in range(100):
             response = self._generate_google_content(contents, instructions)
             function_calls = self._extract_google_function_calls(response)
                 
@@ -187,6 +232,8 @@ class LLMAssistant:
                     self.memory_store,
                     self.weather_service,
                     self.news_service,
+                    self.knowledge_service,
+                    self.web_search_service,
                     name=function_call.get("name", ""),
                     arguments=function_call.get("args") or {},
                     call_id=function_call.get("id"),
@@ -222,7 +269,7 @@ class LLMAssistant:
         payload = {
             "systemInstruction": {"parts": [{"text": instructions}]},
             "contents": contents,
-            "tools": build_rest_tools(),
+            "tools": build_rest_tools(enable_knowledge=self.knowledge_service is not None),
             "generationConfig": {"temperature": 0.7},
         }
         request = Request(

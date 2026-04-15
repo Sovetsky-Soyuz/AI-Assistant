@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Orbit Virtual Assistant</title>
     <link rel="stylesheet" href="/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   </head>
   <body>
     <div class="page-shell">
@@ -14,7 +15,7 @@
           <h1>Orbit Virtual Assistant</h1>
           <p class="hero-copy">
             A lighter assistant: a character-like stage, screen-aware chat,
-            memory, weather, live news, IELTS coaching, and browser voice on your own laptop.
+            memory, weather, live news, coaching, and browser voice on your own laptop.
           </p>
         </div>
         <div class="hero-meta">
@@ -89,7 +90,7 @@
                 <div class="mode-switch">
                   <button class="mode-button active" data-mode="simple">Simple assistant</button>
                   <button class="mode-button" data-mode="copilot">Virtual copilot</button>
-                  <button class="mode-button" data-mode="ielts">IELTS coach</button>
+                  <button class="mode-button" data-mode="coach">Expert Coach</button>
                 </div>
               </div>
               <div class="quick-actions">
@@ -106,34 +107,29 @@
                 >
                   Read my screen
                 </button>
-                <button class="ghost-button" data-prompt="Start a short IELTS Speaking mock test for me.">
-                  Speaking mock
+                <button class="ghost-button" data-prompt="Based on my local papers and files, let's start a personalized lesson on our current topic.">
+                  Start Lesson (RAG)
                 </button>
               </div>
             </div>
 
-            <div id="ieltsPanel" class="ielts-panel hidden">
-              <div class="ielts-grid">
+            <div id="coachPanel" class="coach-panel hidden">
+              <div class="coach-grid">
                 <label class="stack-field">
-                  <span>IELTS skill</span>
-                  <select id="ieltsSkillSelect">
-                    <option value="speaking">Speaking</option>
-                    <option value="writing">Writing</option>
-                    <option value="reading">Reading</option>
-                    <option value="listening">Listening</option>
-                  </select>
+                  <span>Learning Topic</span>
+                  <input id="coachTopicInput" type="text" placeholder="e.g., Python, Physics, Piano..." />
                 </label>
                 <label class="stack-field">
-                  <span>Target band</span>
-                  <input id="targetBandInput" type="text" value="6.5" placeholder="6.5" />
+                  <span>Target Level</span>
+                  <input id="coachLevelInput" type="text" placeholder="e.g., Beginner, Pro, Interview Prep..." />
                 </label>
                 <label class="stack-field">
                   <span>Conversation language</span>
                   <select id="conversationLanguageSelect" aria-label="Conversation language"></select>
                 </label>
               </div>
-              <p class="tiny ielts-copy" id="ieltsModeCopy">
-                Orbit can run examiner-style speaking turns, score writing, teach reading strategy, and build listening drills.
+              <p class="tiny coach-copy" id="coachModeCopy">
+                Orbit will act as a personal tutor. For best results, enable RAG mode to use your local documents as the textbook.
               </p>
             </div>
 
@@ -147,7 +143,7 @@
               <textarea
                 id="messageInput"
                 rows="3"
-                placeholder="Ask for advice, weather, news, IELTS practice, or help with what is on your screen..."
+                placeholder="Ask for expert coaching, local doc analysis, weather, news, or help with your screen..."
               ></textarea>
               <div class="composer-footer">
                 <div class="composer-side">
@@ -159,11 +155,12 @@
                 </div>
                 <div class="composer-side">
                   <select id="voiceLanguageSelect" class="voice-language-select" aria-label="Voice input language"></select>
-                  <button type="button" class="secondary-button" id="micButton">Hold to talk</button>
+                  <button type="button" class="secondary-button" id="micButton">Hold to talk (Control)</button>
                   <button type="submit" class="primary-button" id="sendButton">Send</button>
                 </div>
               </div>
-              <div class="shortcut-note">Press M to activate voice input, press again to deactivate.</div>
+              <div class="shortcut-note">Press Control to activate voice input, release to stop.</div>
+              <div class="shortcut-note">AI can make mistakes. Consider checking important information.</div>
             </form>
           </section>
         </section>
@@ -231,22 +228,22 @@
           <section class="panel">
             <div class="card-head">
               <div>
-                <p class="section-kicker">IELTS Lab</p>
-                <h2>Practice blocks</h2>
+                <p class="section-kicker">Knowledge Lab</p>
+                <h2>Dynamic Coaching</h2>
               </div>
             </div>
             <div class="practice-stack">
-              <button class="ghost-button practice-button" data-ielts-skill="speaking" data-prompt="Run an IELTS Speaking Part 1 practice with me.">
-                Speaking warm-up
+              <button class="ghost-button practice-button" data-prompt="Quiz me on the main concepts found in my local documents.">
+                Local Docs Quiz
               </button>
-              <button class="ghost-button practice-button" data-ielts-skill="writing" data-prompt="Help me plan an IELTS Writing Task 2 answer.">
-                Writing planner
+              <button class="ghost-button practice-button" data-prompt="Look at my screen and help me explain the logic of this code or project." data-needs-screen="true">
+                Read & Explain Screen
               </button>
-              <button class="ghost-button practice-button" data-ielts-skill="reading" data-prompt="Teach me a fast IELTS Reading strategy for True False Not Given questions.">
-                Reading strategy
+              <button class="ghost-button practice-button" data-prompt="Explain the most complex topic in my library like I'm five.">
+                ELI5 Complex Topics
               </button>
-              <button class="ghost-button practice-button" data-ielts-skill="listening" data-prompt="Give me a short IELTS Listening-style note completion drill.">
-                Listening drill
+              <button class="ghost-button practice-button" data-prompt="Create a 7-day study roadmap based on the files in my Knowledge folder.">
+                Generate Roadmap
               </button>
             </div>
           </section>
