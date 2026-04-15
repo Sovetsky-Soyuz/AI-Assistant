@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Orbit Virtual Assistant
 
 This main app is now the simple virtual-assistant foundation for the project.
@@ -36,3 +37,6 @@ python run.py
 - The sibling folders are still useful:
   - `AI_Assistant S2S` is the Gemini Live speech-to-speech version
   - `AI_Assistant_whisper_in_asr` is the local Whisper streaming ASR version
+=======
+# AI-Assistant
+>>>>>>> a50729c20012b8fcb62fd5547a222e1693ce4d08
