@@ -1,0 +1,28 @@
+# Orbit Virtual Assistant - Dependencies
+# Python 3.10+ required
+#
+# Install core deps:  pip install -r requirements.txt
+# Install with RAG:   pip install -r requirements.txt -E rag
+
+# =============================================
+# Core Dependencies (always required)
+# =============================================
+pymongo>=4.7                    # MongoDB driver for memory/session storage
+ddgs>=6.0                       # DuckDuckGo search (fallback web search)
+
+# =============================================
+# Optional: Enhanced Web Search
+# =============================================
+tavily-python>=0.5              # Tavily API (primary web search, optional)
+
+# =============================================
+# Optional: Local RAG / Knowledge Base
+# (Only needed if you enable RAG at startup)
+# =============================================
+langchain-community>=0.2        # Document loaders, FAISS vectorstore, BM25 retriever
+langchain-text-splitters>=0.2   # Text chunking for document processing
+langchain-openai>=0.1           # OpenAI-compatible embeddings (for LM Studio)
+langchain-classic>=1.0          # EnsembleRetriever (hybrid BM25 + FAISS)
+faiss-cpu>=1.8                  # Vector similarity search engine
+rank-bm25>=0.2                  # BM25 keyword-based retrieval
+unstructured>=0.15              # Document parsing (PDF, DOCX, TXT, etc.)

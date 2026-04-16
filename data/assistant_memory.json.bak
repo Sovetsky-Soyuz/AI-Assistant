@@ -1,0 +1,279 @@
+{
+  "profile": {
+    "display_name": "Minh Quang",
+    "location": "Ho Chi Minh City",
+    "routine": "",
+    "notes": [
+      {
+        "id": "9eecae10",
+        "category": "reminder",
+        "text": "Tomorrow, go to work",
+        "created_at": "2026-04-14T09:24:19+00:00"
+      },
+      {
+        "id": "d1b624c1",
+        "category": "habit",
+        "text": "Drink more water",
+        "created_at": "2026-04-15T15:20:00+00:00"
+      }
+    ]
+  },
+  "tasks": [
+    {
+      "id": "552c9b30",
+      "title": "Make some research of my thesis",
+      "priority": "high",
+      "due_date": "",
+      "status": "done",
+      "created_at": "2026-04-12T16:07:11+00:00",
+      "completed_at": "2026-04-12T16:07:13+00:00"
+    },
+    {
+      "id": "6b053819",
+      "title": "Make some research of my thesis",
+      "priority": "high",
+      "due_date": "",
+      "status": "open",
+      "created_at": "2026-04-12T16:07:17+00:00",
+      "completed_at": ""
+    },
+    {
+      "id": "5759a099",
+      "title": "Crawl data",
+      "priority": "high",
+      "due_date": "Today",
+      "status": "open",
+      "created_at": "2026-04-14T03:26:45+00:00",
+      "completed_at": ""
+    }
+  ],
+  "last_weather": {
+    "location": "Ho Chi Minh City, Vietnam",
+    "latitude": 10.82302,
+    "longitude": 106.62965,
+    "condition": "Partly cloudy",
+    "temperature_c": 27.3,
+    "feels_like_c": 33.0,
+    "humidity_pct": 87,
+    "wind_kph": 6.8,
+    "precipitation_mm": 0.0,
+    "high_c": 34.7,
+    "low_c": 25.5,
+    "rain_chance_pct": 10,
+    "advice": "Conditions look manageable for most daily errands."
+  },
+  "activity": [
+    {
+      "id": "2bca46c1",
+      "kind": "weather_checked",
+      "payload": {
+        "location": "Ho Chi Minh City, Vietnam"
+      },
+      "created_at": "2026-04-12T16:06:00+00:00"
+    },
+    {
+      "id": "ee1c5b73",
+      "kind": "weather_checked",
+      "payload": {
+        "location": "Ho Chi Minh City, Vietnam"
+      },
+      "created_at": "2026-04-12T16:06:34+00:00"
+    },
+    {
+      "id": "530a263c",
+      "kind": "task_added",
+      "payload": {
+        "id": "552c9b30",
+        "title": "Make some research of my thesis",
+        "priority": "high",
+        "due_date": "",
+        "status": "open",
+        "created_at": "2026-04-12T16:07:11+00:00",
+        "completed_at": ""
+      },
+      "created_at": "2026-04-12T16:07:11+00:00"
+    },
+    {
+      "id": "ec3a0c4c",
+      "kind": "task_completed",
+      "payload": {
+        "id": "552c9b30",
+        "title": "Make some research of my thesis"
+      },
+      "created_at": "2026-04-12T16:07:13+00:00"
+    },
+    {
+      "id": "42441f22",
+      "kind": "task_added",
+      "payload": {
+        "id": "6b053819",
+        "title": "Make some research of my thesis",
+        "priority": "high",
+        "due_date": "",
+        "status": "open",
+        "created_at": "2026-04-12T16:07:17+00:00",
+        "completed_at": ""
+      },
+      "created_at": "2026-04-12T16:07:17+00:00"
+    },
+    {
+      "id": "7d4939f6",
+      "kind": "profile_updated",
+      "payload": {
+        "display_name": "Minh Quang",
+        "location": "Ho Chi Minh City"
+      },
+      "created_at": "2026-04-12T16:09:28+00:00"
+    },
+    {
+      "id": "456acda1",
+      "kind": "profile_updated",
+      "payload": {
+        "display_name": "Minh Quang",
+        "location": "Ho Chi Minh City"
+      },
+      "created_at": "2026-04-12T16:09:28+00:00"
+    },
+    {
+      "id": "c994fbc7",
+      "kind": "weather_checked",
+      "payload": {
+        "location": "Ho Chi Minh City, Vietnam"
+      },
+      "created_at": "2026-04-12T16:28:26+00:00"
+    },
+    {
+      "id": "05a05fa7",
+      "kind": "weather_checked",
+      "payload": {
+        "location": "Ho Chi Minh City, Vietnam"
+      },
+      "created_at": "2026-04-12T17:08:14+00:00"
+    },
+    {
+      "id": "30eaa9c1",
+      "kind": "news_checked",
+      "payload": {
+        "topic": "Ho Chi Minh City headlines"
+      },
+      "created_at": "2026-04-14T03:25:06+00:00"
+    },
+    {
+      "id": "3f717376",
+      "kind": "task_added",
+      "payload": {
+        "id": "5759a099",
+        "title": "Crawl data",
+        "priority": "high",
+        "due_date": "Today",
+        "status": "open",
+        "created_at": "2026-04-14T03:26:45+00:00",
+        "completed_at": ""
+      },
+      "created_at": "2026-04-14T03:26:45+00:00"
+    },
+    {
+      "id": "b1ebe377",
+      "kind": "note_saved",
+      "payload": {
+        "id": "9eecae10",
+        "category": "reminder",
+        "text": "Tomorrow, go to work",
+        "created_at": "2026-04-14T09:24:19+00:00"
+      },
+      "created_at": "2026-04-14T09:24:19+00:00"
+    },
+    {
+      "id": "08523db1",
+      "kind": "news_checked",
+      "payload": {
+        "topic": "world headlines"
+      },
+      "created_at": "2026-04-14T15:05:11+00:00"
+    },
+    {
+      "id": "48ba2485",
+      "kind": "news_checked",
+      "payload": {
+        "topic": "Ho Chi Minh City headlines"
+      },
+      "created_at": "2026-04-15T11:13:59+00:00"
+    },
+    {
+      "id": "890004ba",
+      "kind": "weather_checked",
+      "payload": {
+        "location": "Ho Chi Minh City, Vietnam"
+      },
+      "created_at": "2026-04-15T11:14:11+00:00"
+    },
+    {
+      "id": "33065c2d",
+      "kind": "note_saved",
+      "payload": {
+        "id": "d1b624c1",
+        "category": "habit",
+        "text": "Drink more water",
+        "created_at": "2026-04-15T15:20:00+00:00"
+      },
+      "created_at": "2026-04-15T15:20:00+00:00"
+    },
+    {
+      "id": "334a9227",
+      "kind": "weather_checked",
+      "payload": {
+        "location": "Ho Chi Minh City, Vietnam"
+      },
+      "created_at": "2026-04-15T15:20:11+00:00"
+    },
+    {
+      "id": "690accbc",
+      "kind": "news_checked",
+      "payload": {
+        "topic": "Ho Chi Minh City headlines"
+      },
+      "created_at": "2026-04-15T15:20:15+00:00"
+    },
+    {
+      "id": "313e4c06",
+      "kind": "weather_checked",
+      "payload": {
+        "location": "Ho Chi Minh City, Vietnam"
+      },
+      "created_at": "2026-04-15T16:57:56+00:00"
+    },
+    {
+      "id": "f97b06a6",
+      "kind": "news_checked",
+      "payload": {
+        "topic": "Ho Chi Minh City"
+      },
+      "created_at": "2026-04-15T16:57:57+00:00"
+    }
+  ],
+  "updated_at": "2026-04-15T16:57:57+00:00",
+  "last_news": {
+    "topic": "Ho Chi Minh City",
+    "items": [
+      {
+        "title": "Vietnam Joins Thailand, Singapore, Malaysia, Indonesia, China, South Korea, India and Japan as Hanoi, Ho Chi Minh City and Da Nang Drive Record Tourism Growth of Above Six Million Visitors Across Southeast Asia in 2026 with Bangkok, Singapore, Kual - Travel And Tour World",
+        "link": "https://news.google.com/rss/articles/CBMi3wJBVV95cUxQNVQwNnFaNzh5YzBlaXlqRG1iTmJ2djEwZjFtMmlhYUhNblA3bTJsbV9PLV9fMUpCS3RqRjEwTnVkWE5JbjBDX0N3ZjZ1c0hkaXNuN0E4NTNQd0J0MmtPX0Y2dDlQdEV1cVgtWmZxU19xLWhORWZoMTRDbENCMTBOYVAwMk9yQWFqTDc2M2tPZUI4NTdBYmpZRTJabWF3LTJHTjFPdnJaUmQyMnJGcDZoQ1NLME5rLXdaSnNkYURCUHNjX1psWnd6QzFJNnoxb1htby1udlNOUzhLTzYzU0ZDQThQLXF5Tk1qY1NQaFlWQXlYdHZ5YVdSVDBVR1p1T0k3cUU2SkZ6VFJBd0dmd3NYUDNDeFI1WmU5eGV0Q0thdlNTckg3Q0Q2NGhlM0ZTWEJVNVJKb0VIakNVZGVQbHFJQ3NmdXRNVy1ibEFITEVISF9yUWhyRkgyenR2M191NU0?oc=5",
+        "source": "Travel And Tour World",
+        "published_at": "Tue, 14 Apr 2026 14:04:29 GMT"
+      },
+      {
+        "title": "HCMC to move 400 downtown trees for 2nd metro line construction - VnExpress International",
+        "link": "https://news.google.com/rss/articles/CBMiugFBVV95cUxNQU81M1cxVmJTU2w5SG5qa2RJZEtOVTN2WHE3RUljV2NCVFJKcS04Slphbl9kNUhybVJ5UGY3Uk9yb3lDQ3F0RjJ5SEpNWFEzUFl2Q3B6eFRlWXFTelNCemV0Y2hUNHZPZ3VKQmVWbE9XMjFhUmgzM1hESFpfS1ZLWm1FTFU5WHJJcWM3S2sxWFA2X0V6by1xVWdWaFBMSjJra3JXemtOTWhpWUJEdkdzbGlELUhzenZNZFE?oc=5",
+        "source": "VnExpress International",
+        "published_at": "Tue, 14 Apr 2026 06:36:41 GMT"
+      },
+      {
+        "title": "Rain expected to ease southern Vietnam heat this week - Tuoi Tre News | The News Gateway to Vietnam",
+        "link": "https://news.google.com/rss/articles/CBMiogFBVV95cUxPQlh2SzNBVkdIcGRXZ2NDUUpxRU4tbHlacXI5X0h4ZnNDbVZDY0VNbU9IbVV4R0htcWJ6NDN1RWtBX0dmck9scUU1V2pqQ0RnQUx0NEtsMl9ac3lUNElUcEZUUzVoUXlfMktUWUxhSWRyOVFBSW0tRzY3aVdWQkpTNDBlNk1Fd3lvc3l5ME5vWl92RWtBcll5VmU1cWFxZkhKcmc?oc=5",
+        "source": "Tuoi Tre News | The News Gateway to Vietnam",
+        "published_at": "Mon, 13 Apr 2026 07:53:00 GMT"
+      }
+    ],
+    "updated_at": "2026-04-15T16:57:57+00:00"
+  }
+}

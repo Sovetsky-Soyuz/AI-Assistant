@@ -32,6 +32,8 @@ class Settings:
     rag_docs_path: str = ""
     lm_studio_url: str = ""
     ollama_url: str = ""
+    mongodb_uri: str = "mongodb://localhost:27017"
+    mongodb_db: str = "orbit_assistant"
 
     @property
     def provider_name(self) -> str:
@@ -56,7 +58,7 @@ def get_settings() -> Settings:
 
     return Settings(
         root_dir=root_dir,
-        web_dir=root_dir / "web",
+        web_dir=root_dir / "frontend",
         data_dir=root_dir / "data",
         active_provider=os.getenv("ACTIVE_PROVIDER", "google").strip().lower(),
         google_api_key=os.getenv("GOOGLE_API_KEY", "").strip(),
@@ -68,4 +70,6 @@ def get_settings() -> Settings:
         rag_docs_path=os.getenv("RAG_DOCS_PATH", "").strip(),
         lm_studio_url=os.getenv("LM_STUDIO_URL", "http://127.0.0.1:1234/v1").strip(),
         ollama_url=os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/v1").strip(),
+        mongodb_uri=os.getenv("MONGODB_URI", "mongodb://localhost:27017").strip(),
+        mongodb_db=os.getenv("MONGODB_DB", "orbit_assistant").strip(),
     )

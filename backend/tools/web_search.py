@@ -66,7 +66,7 @@ class WebSearchService:
         if self.enable_tavily and self.tavily_api_key and TavilyClient:
             self.tavily_client = TavilyClient(api_key=self.tavily_api_key)
 
-    def search(self, query: str, max_results: int = 3) -> list[dict[str, str]]:
+    def search(self, query: str, max_results: int = 100) -> list[dict[str, str]]:
         query = query.strip()
         if not query:
             raise WebSearchError("Query must not be empty.")

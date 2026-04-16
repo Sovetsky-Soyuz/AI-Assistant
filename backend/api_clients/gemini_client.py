@@ -8,17 +8,16 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-from .config import Settings
-from .memory_store import MemoryStore
-from .news import NewsService
-from .orbit_brain import (
+from ..config import Settings
+from ..core.memory_store import MemoryStore
+from ..tools.news import NewsService
+from ..core.orbit_brain import (
     build_rest_tools,
     build_system_instruction,
-    normalize_ielts_skill,
     normalize_mode,
     run_tool_call,
 )
-from .weather import WeatherService
+from ..tools.weather import WeatherService
 
 
 API_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
