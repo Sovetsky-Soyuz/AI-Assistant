@@ -192,6 +192,7 @@ const elements = {
   noteForm: document.getElementById("noteForm"),
   noteTextInput: document.getElementById("noteTextInput"),
   noteCategoryInput: document.getElementById("noteCategoryInput"),
+  fileAttachInput: document.getElementById("fileAttachInput"),
 };
 
 // ---------- Initialization ----------
@@ -368,8 +369,10 @@ function bindEvents() {
 
   // Composer toggle chips
   elements.attachFilesBtn.addEventListener("click", () => {
-    addMessage("system", "Sorry, I don't have this function yet. File upload will be available in a future update.");
+    elements.fileAttachInput.click();
   });
+
+  elements.fileAttachInput.addEventListener("change", handleFileAttach);
 
   setupToggleChip(elements.createImageBtn, "imageGenActive");
   setupToggleChip(elements.thinkingToggle, "thinkingActive");
@@ -510,6 +513,7 @@ function startNewChat() {
   appState.conversation = [];
   elements.messageList.innerHTML = "";
   elements.toolEvents.innerHTML = "";
+  elements.attachFilesBtn.classList.remove("active");
   addMessage("system", "New conversation started.");
   renderSessions(appState.sessions);
   updateSessionActionButtons();
@@ -1000,6 +1004,7 @@ async function sendPrompt(prompt, options = {}) {
         thinkingMode: appState.thinkingActive,
         imageGen: appState.imageGenActive,
         offlineMode: appState.offlineModeActive,
+        sessionId: appState.activeSessionId || "",
       }),
     });
 
@@ -1557,6 +1562,92 @@ async function saveMessageAsNote(bodyEl, messageEl) {
   } catch (err) {
     addMessage("system", `Failed to save note: ${err.message}`);
   }
+}
+
+// ---------- File Attachment ----------
+
+async function handleFileAttach() {
+  const files = elements.fileAttachInput.files;
+  if (!files || files.length === 0) return;
+
+  // Auto-create session if none exists
+  if (!appState.activeSessionId) {
+    try {
+      const sessionRes = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "File attachment chat" }),
+      });
+      const sessionData = await sessionRes.json();
+      if (sessionRes.ok && sessionData.session) {
+        appState.activeSessionId = sessionData.session.session_id;
+        await refreshSessions();
+      }
+    } catch (err) {
+      addMessage("system", `Failed to create session: ${err.message}`);
+      elements.fileAttachInput.value = "";
+      return;
+    }
+  }
+
+  for (const file of files) {
+    const allowedExts = [".pdf", ".docx", ".doc", ".txt", ".md", ".csv", ".json"];
+    const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
+    if (!allowedExts.includes(ext)) {
+      addMessage("system", `Unsupported file type: ${ext}. Allowed: ${allowedExts.join(", ")}`);
+      continue;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+      addMessage("system", `File too large: ${file.name}. Maximum 20 MB.`);
+      continue;
+    }
+
+    addMessage("system", `Uploading ${file.name}...`);
+
+    try {
+      const base64Data = await fileToBase64(file);
+      const response = await fetch(`/api/sessions/${appState.activeSessionId}/attachments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, data: base64Data }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        addMessage("system", data.error || `Failed to upload ${file.name}.`);
+        continue;
+      }
+
+      const chunks = data.attachment?.chunk_count ?? "?";
+      const parseErr = data.attachment?.parse_error;
+      if (parseErr) {
+        addMessage("system", `Attached ${file.name} but could not parse for search: ${parseErr}`);
+      } else {
+        addMessage("system", `Attached ${file.name} (${chunks} chunks indexed). You can now ask questions about it.`);
+      }
+      // Update attach button visual
+      elements.attachFilesBtn.classList.add("active");
+    } catch (err) {
+      addMessage("system", `Upload error for ${file.name}: ${err.message}`);
+    }
+  }
+
+  // Reset input so the same file can be re-selected
+  elements.fileAttachInput.value = "";
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      // result is "data:...;base64,XXXX" -- we only want the base64 part
+      const result = reader.result;
+      const base64 = result.substring(result.indexOf(",") + 1);
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 // ---------- Screen Sharing ----------

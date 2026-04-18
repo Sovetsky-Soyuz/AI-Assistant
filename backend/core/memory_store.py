@@ -47,6 +47,18 @@ def utc_now() -> str:
 #
 # Collection: cache  (_id = "last_weather" | "last_news")
 #   { data: dict, updated_at: str }
+#
+# Collection: knowledge_chunks
+#   { chunk_id: str, source_file: str, file_hash: str, chunk_index: int,
+#     text: str, metadata: dict, created_at: str }
+#
+# Collection: session_attachments
+#   { attachment_id: str, session_id: str, filename: str, file_type: str,
+#     file_size: int, storage_path: str, created_at: str }
+#
+# Collection: session_chunks
+#   { chunk_id: str, attachment_id: str, session_id: str, chunk_index: int,
+#     text: str, metadata: dict, created_at: str }
 # ---------------------------------------------------------------------------
 
 _MAX_ACTIVITY_ENTRIES = 20
@@ -95,6 +107,9 @@ class MemoryStore:
         self._tasks: Collection = self._db["tasks"]
         self._activity: Collection = self._db["activity"]
         self._cache: Collection = self._db["cache"]
+        self._knowledge_chunks: Collection = self._db["knowledge_chunks"]
+        self._session_attachments: Collection = self._db["session_attachments"]
+        self._session_chunks: Collection = self._db["session_chunks"]
 
         self._ensure_indexes()
         self._ensure_profile()
@@ -109,6 +124,14 @@ class MemoryStore:
         self._tasks.create_index("task_id", unique=True)
         self._notes.create_index("note_id", unique=True)
         self._activity.create_index([("created_at", DESCENDING)])
+        self._knowledge_chunks.create_index("chunk_id", unique=True)
+        self._knowledge_chunks.create_index("source_file")
+        self._knowledge_chunks.create_index("file_hash")
+        self._session_attachments.create_index("attachment_id", unique=True)
+        self._session_attachments.create_index("session_id")
+        self._session_chunks.create_index("chunk_id", unique=True)
+        self._session_chunks.create_index("session_id")
+        self._session_chunks.create_index("attachment_id")
 
     def _ensure_profile(self) -> None:
         if self._profile.find_one({"_id": "user_profile"}) is None:
@@ -606,13 +629,21 @@ class MemoryStore:
             raise KeyError(f"Session '{session_id}' not found.")
         return self._strip_id(result)
 
-    def delete_session(self, session_id: str) -> None:
+    def delete_session(self, session_id: str) -> list[dict[str, Any]]:
+        """Delete session and return attachment docs (for disk cleanup by caller)."""
         with self._lock:
+            attachments = [
+                self._strip_id(a)
+                for a in self._session_attachments.find({"session_id": session_id})
+            ]
             self._sessions.delete_one({"session_id": session_id})
             self._messages.delete_many({"session_id": session_id})
+            self._session_attachments.delete_many({"session_id": session_id})
+            self._session_chunks.delete_many({"session_id": session_id})
             self._append_activity_record(
                 "session_deleted", {"session_id": session_id}
             )
+        return attachments
 
     # ==================================================================
     # Message management  (new -- per-message CRUD)
@@ -656,6 +687,147 @@ class MemoryStore:
     def delete_message(self, message_id: str) -> None:
         with self._lock:
             self._messages.delete_one({"message_id": message_id})
+
+    # ==================================================================
+    # Knowledge chunks  (persistent RAG cache from knowledge_base)
+    # ==================================================================
+
+    def get_knowledge_file_hashes(self) -> dict[str, str]:
+        """Return {source_file: file_hash} for all indexed knowledge files."""
+        with self._lock:
+            pipeline = [
+                {"$group": {"_id": "$source_file", "hash": {"$first": "$file_hash"}}},
+            ]
+            results = list(self._knowledge_chunks.aggregate(pipeline))
+        return {r["_id"]: r["hash"] for r in results}
+
+    def store_knowledge_chunks(
+        self, source_file: str, file_hash: str, chunks: list[dict[str, Any]]
+    ) -> int:
+        """Store parsed chunks for a knowledge_base file. Replaces old chunks."""
+        now = utc_now()
+        with self._lock:
+            self._knowledge_chunks.delete_many({"source_file": source_file})
+            docs = [
+                {
+                    "chunk_id": uuid.uuid4().hex[:12],
+                    "source_file": source_file,
+                    "file_hash": file_hash,
+                    "chunk_index": i,
+                    "text": c["text"],
+                    "metadata": c.get("metadata", {}),
+                    "created_at": now,
+                }
+                for i, c in enumerate(chunks)
+            ]
+            if docs:
+                self._knowledge_chunks.insert_many(docs)
+        return len(docs)
+
+    def get_all_knowledge_chunks(self) -> list[dict[str, Any]]:
+        """Return all knowledge chunks for building retrievers at startup."""
+        with self._lock:
+            docs = list(
+                self._knowledge_chunks.find().sort(
+                    [("source_file", ASCENDING), ("chunk_index", ASCENDING)]
+                )
+            )
+        return [self._strip_id(d) for d in docs]
+
+    def delete_knowledge_file(self, source_file: str) -> None:
+        """Remove all chunks for a specific knowledge_base file."""
+        with self._lock:
+            self._knowledge_chunks.delete_many({"source_file": source_file})
+
+    def clear_all_knowledge_chunks(self) -> int:
+        """Drop all knowledge chunks and rebuild indexes. Returns count of cleared docs."""
+        with self._lock:
+            count = self._knowledge_chunks.count_documents({})
+            self._knowledge_chunks.drop()
+        self._ensure_indexes()
+        return count
+
+    # ==================================================================
+    # Session attachments  (files attached in chat sessions)
+    # ==================================================================
+
+    def add_session_attachment(
+        self,
+        session_id: str,
+        filename: str,
+        file_type: str,
+        file_size: int,
+        storage_path: str,
+    ) -> dict[str, Any]:
+        attachment_id = uuid.uuid4().hex[:12]
+        now = utc_now()
+        doc = {
+            "attachment_id": attachment_id,
+            "session_id": session_id,
+            "filename": filename,
+            "file_type": file_type,
+            "file_size": file_size,
+            "storage_path": storage_path,
+            "created_at": now,
+        }
+        with self._lock:
+            self._session_attachments.insert_one(doc)
+            self._append_activity_record(
+                "attachment_added",
+                {"attachment_id": attachment_id, "session_id": session_id, "filename": filename},
+            )
+        return self._strip_id(doc)
+
+    def get_session_attachments(self, session_id: str) -> list[dict[str, Any]]:
+        with self._lock:
+            docs = list(
+                self._session_attachments.find({"session_id": session_id}).sort("created_at", ASCENDING)
+            )
+        return [self._strip_id(d) for d in docs]
+
+    def delete_session_attachment(self, attachment_id: str) -> dict[str, Any] | None:
+        """Delete an attachment and its chunks. Returns the attachment doc for disk cleanup."""
+        with self._lock:
+            doc = self._session_attachments.find_one({"attachment_id": attachment_id})
+            if doc is None:
+                return None
+            self._session_attachments.delete_one({"_id": doc["_id"]})
+            self._session_chunks.delete_many({"attachment_id": attachment_id})
+        return self._strip_id(doc)
+
+    # ==================================================================
+    # Session chunks  (parsed text from session attachments)
+    # ==================================================================
+
+    def store_session_chunks(
+        self, session_id: str, attachment_id: str, chunks: list[dict[str, Any]]
+    ) -> int:
+        now = utc_now()
+        with self._lock:
+            docs = [
+                {
+                    "chunk_id": uuid.uuid4().hex[:12],
+                    "attachment_id": attachment_id,
+                    "session_id": session_id,
+                    "chunk_index": i,
+                    "text": c["text"],
+                    "metadata": c.get("metadata", {}),
+                    "created_at": now,
+                }
+                for i, c in enumerate(chunks)
+            ]
+            if docs:
+                self._session_chunks.insert_many(docs)
+        return len(docs)
+
+    def get_session_chunks(self, session_id: str) -> list[dict[str, Any]]:
+        with self._lock:
+            docs = list(
+                self._session_chunks.find({"session_id": session_id}).sort(
+                    [("attachment_id", ASCENDING), ("chunk_index", ASCENDING)]
+                )
+            )
+        return [self._strip_id(d) for d in docs]
 
     # ==================================================================
     # Data migration  (one-time import from legacy JSON files)

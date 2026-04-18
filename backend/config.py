@@ -29,6 +29,7 @@ class Settings:
     assistant_port: int
     default_location: str
     live_voice_name: str
+    embedding_model: str = ""
     rag_docs_path: str = ""
     lm_studio_url: str = ""
     ollama_url: str = ""
@@ -72,4 +73,5 @@ def get_settings() -> Settings:
         ollama_url=os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/v1").strip(),
         mongodb_uri=os.getenv("MONGODB_URI", "mongodb://localhost:27017").strip(),
         mongodb_db=os.getenv("MONGODB_DB", "orbit_assistant").strip(),
+        embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-bge-m3").strip(),
     )

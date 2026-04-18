@@ -233,6 +233,21 @@ _FUNCTION_DECLARATIONS = [
     # },
 
     {
+        "name": "search_session_docs",
+        "description": "Search within files that the user has attached to the current chat session. Use this when the user uploads a document and then asks questions about it.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The search query or keywords to look up in the attached session documents.",
+                }
+            },
+            "required": ["query"]
+        }
+    },
+
+    {
         "name": "search_web",
         "description": "CRITICAL MANDATORY TOOL: Search the live internet for facts, up-to-date knowledge, or things you do not know. MUST be used when asked about specific entities, pop culture, or trivia.",
         "parameters": {
@@ -318,9 +333,11 @@ def build_system_instruction(
     search_mode_note = ""
     if web_search_only:
         search_mode_note = (
-            "\nSEARCH MODE: WEB SEARCH ONLY. The user has activated the Web Search toggle. "
-            "You MUST use the `search_web` tool for ALL factual or information-retrieval queries. "
-            "The `search_local_docs` tool is NOT available in this mode. Do NOT attempt to call it."
+            "\nSEARCH MODE: WEB SEARCH PRIORITIZED. The user has activated the Web Search toggle. "
+            "You SHOULD prefer the `search_web` tool for factual or information-retrieval queries. "
+            "However, `search_local_docs` is also available if the user's question relates to their "
+            "local files or if combining web and local results would give a better answer. "
+            "Use your judgment to decide which tool(s) to call."
         )
     elif offline_mode:
         search_mode_note = (
@@ -341,21 +358,29 @@ def build_system_instruction(
 # def build_rest_tools() -> list[dict[str, Any]]:
 #     return [{"functionDeclarations": _FUNCTION_DECLARATIONS}]
 
-def build_rest_tools(enable_knowledge: bool = True, web_search_only: bool = False, offline_mode: bool = False) -> list[dict[str, Any]]:
+def build_rest_tools(
+    enable_knowledge: bool = True,
+    web_search_only: bool = False,
+    offline_mode: bool = False,
+    enable_session_docs: bool = False,
+) -> list[dict[str, Any]]:
     """Build the function declarations list for the LLM.
 
     - ``enable_knowledge``: include ``search_local_docs`` if RAG is available.
     - ``web_search_only``: when the user toggles "Web Search" ON in the UI,
-      strip ``search_local_docs`` so the LLM is forced to use only
-      ``search_web`` for retrieval.
+      both ``search_web`` and ``search_local_docs`` remain available so the
+      agent can dynamically decide. The system prompt biases toward web.
     - ``offline_mode``: when the user toggles "Offline" ON in the UI,
       strip ``search_web`` so the LLM can only use local tools.
+    - ``enable_session_docs``: include ``search_session_docs`` when the
+      current session has file attachments.
     """
     funcs = [
         f for f in _FUNCTION_DECLARATIONS
         if not (
-            (f["name"] == "search_local_docs" and (not enable_knowledge or web_search_only))
+            (f["name"] == "search_local_docs" and not enable_knowledge)
             or (f["name"] == "search_web" and offline_mode)
+            or (f["name"] == "search_session_docs" and not enable_session_docs)
         )
     ]
     return [{"functionDeclarations": funcs}]
@@ -371,6 +396,7 @@ def run_tool_call(
     name: str,
     arguments: dict[str, Any] | None = None,
     call_id: str | None = None,
+    session_id: str | None = None,
 ) -> ToolRunResult:
     args = arguments or {}
     resolved_call_id = call_id or uuid.uuid4().hex[:8]
@@ -436,9 +462,15 @@ def run_tool_call(
             event = {"type": "memory", "label": f"Retrieved {len(filtered)} note(s)"}
         elif name == "search_local_docs":
             search_results = knowledge_service.search(args.get("query", ""))
-            # result = knowledge_service.search(args.get("query", ""))
             result = {"results": search_results}
             event = {"type": "knowledge", "label": f'Searched local files for: "{args.get("query", "")[:15]}..."'}
+
+        elif name == "search_session_docs":
+            if not knowledge_service or not session_id:
+                raise ValueError("No documents attached to this session.")
+            search_results = knowledge_service.search_session(session_id, args.get("query", ""))
+            result = {"results": search_results}
+            event = {"type": "knowledge", "label": f'Searched session docs for: "{args.get("query", "")[:15]}..."'}
         
         elif name == "search_web":
             if not web_search_service:

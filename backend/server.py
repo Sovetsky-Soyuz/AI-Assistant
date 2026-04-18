@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import os
 import dataclasses
 import json
@@ -16,6 +17,7 @@ from .core.memory_store import MemoryStore
 from .tools.news import NewsError, NewsService
 from .tools.weather import WeatherError, WeatherService
 from .tools.web_search import WebSearchService
+from .tools.knowledge import KnowledgeService
 
 
 class AssistantApplication:
@@ -45,11 +47,13 @@ class AssistantApplication:
                 db_name=settings.mongodb_db,
             )
 
-        if rag_path:
-            from .tools.knowledge import KnowledgeService
-            self.knowledge = KnowledgeService(rag_path)
-        else:
-            self.knowledge = None
+        # --- Knowledge service (always created; RAG requires docs_dir) ---
+        upload_dir = str(settings.data_dir / "uploads")
+        self.knowledge = KnowledgeService(
+            memory_store=self.memory_store,
+            docs_dir=rag_path,
+            upload_dir=upload_dir,
+        )
 
         self.web_search = WebSearchService()
 
@@ -129,6 +133,14 @@ class AssistantApplication:
                 messages = self.memory_store.get_messages(session_id, limit=limit)
                 self._send_json(handler, {"messages": messages})
                 return
+
+        # GET /api/sessions/<session_id>/attachments
+        if path.startswith("/api/sessions/") and path.endswith("/attachments"):
+            session_id = path.replace("/api/sessions/", "").replace("/attachments", "").strip("/")
+            if session_id:
+                attachments = self.memory_store.get_session_attachments(session_id)
+                self._send_json(handler, {"attachments": attachments})
+                return
         
         if path == "/api/weather":
             query = parse_qs(parsed.query)
@@ -189,6 +201,13 @@ class AssistantApplication:
                 self._send_json(handler, {"ok": True, "message": message})
                 return
 
+        # --- Attachment upload (POST /api/sessions/<id>/attachments) ---
+        if parsed.path.startswith("/api/sessions/") and parsed.path.endswith("/attachments"):
+            session_id = parsed.path.replace("/api/sessions/", "").replace("/attachments", "").strip("/")
+            if session_id:
+                self._handle_attachment_upload(handler, payload, session_id)
+                return
+
         if parsed.path == "/api/chat":
             self._handle_chat(handler, payload)
             return
@@ -234,7 +253,7 @@ class AssistantApplication:
             return
 
         # --- Phase 5: Graceful fallback for unsupported POST endpoints ---
-        if parsed.path in {"/api/upload", "/api/generate-image"}:
+        if parsed.path in {"/api/generate-image"}:
             self._send_json(handler, {
                 "reply": self._UNSUPPORTED_REFUSAL,
                 "toolEvents": [],
@@ -271,15 +290,7 @@ class AssistantApplication:
             })
             return
 
-        # File/image attachments (future feature placeholder)
-        if payload.get("attachments"):
-            self._send_json(handler, {
-                "reply": self._UNSUPPORTED_REFUSAL,
-                "toolEvents": [],
-                "memory": self.memory_store.get_state(),
-                "model": self.settings.ai_model,
-            })
-            return
+        session_id = (payload.get("sessionId") or "").strip() or None
 
         try:
             result = self.assistant.chat(
@@ -292,6 +303,7 @@ class AssistantApplication:
                 preferred_language=(payload.get("preferredLanguage") or "default").strip() or "default",
                 web_search_only=bool(payload.get("webSearchOnly", False)),
                 offline_mode=bool(payload.get("offlineMode", False)),
+                session_id=session_id,
             )
         except LLMClientError as exc:
             self._send_json(handler, {"error": str(exc)}, status=HTTPStatus.BAD_GATEWAY)
@@ -306,6 +318,79 @@ class AssistantApplication:
                 "model": self.settings.ai_model,
             },
         )
+
+    # ------------------------------------------------------------------
+    # Attachment upload
+    # ------------------------------------------------------------------
+
+    _ALLOWED_ATTACH_TYPES = {".pdf", ".docx", ".doc", ".txt", ".md", ".csv", ".json"}
+    _MAX_ATTACH_SIZE = 20 * 1024 * 1024  # 20 MB
+
+    def _handle_attachment_upload(
+        self, handler: BaseHTTPRequestHandler, payload: dict[str, Any], session_id: str
+    ) -> None:
+        """Accept a base64-encoded file, save to disk, parse and index for search."""
+        filename = (payload.get("filename") or "").strip()
+        file_data_b64 = (payload.get("data") or "").strip()
+
+        if not filename or not file_data_b64:
+            self._send_json(handler, {"error": "Missing filename or data."}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in self._ALLOWED_ATTACH_TYPES:
+            self._send_json(
+                handler,
+                {"error": f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(self._ALLOWED_ATTACH_TYPES))}"},
+                status=HTTPStatus.BAD_REQUEST,
+            )
+            return
+
+        try:
+            file_bytes = base64.b64decode(file_data_b64)
+        except Exception:
+            self._send_json(handler, {"error": "Invalid base64 data."}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        if len(file_bytes) > self._MAX_ATTACH_SIZE:
+            self._send_json(
+                handler,
+                {"error": f"File too large. Maximum size is {self._MAX_ATTACH_SIZE // (1024*1024)} MB."},
+                status=HTTPStatus.BAD_REQUEST,
+            )
+            return
+
+        # Save to disk
+        upload_dir = self.knowledge.upload_dir
+        os.makedirs(upload_dir, exist_ok=True)
+        safe_name = f"{session_id}_{filename}"
+        disk_path = os.path.join(upload_dir, safe_name)
+        with open(disk_path, "wb") as f:
+            f.write(file_bytes)
+
+        # Register in MongoDB
+        attachment = self.memory_store.add_session_attachment(
+            session_id=session_id,
+            filename=filename,
+            file_type=ext,
+            file_size=len(file_bytes),
+            storage_path=disk_path,
+        )
+
+        # Parse and index the file for session-scoped search
+        try:
+            chunk_count = self.knowledge.index_session_file(
+                session_id=session_id,
+                attachment_id=attachment["attachment_id"],
+                file_path=disk_path,
+                filename=filename,
+            )
+            attachment["chunk_count"] = chunk_count
+        except ValueError as exc:
+            # File saved but parsing failed -- still keep the attachment record
+            attachment["parse_error"] = str(exc)
+
+        self._send_json(handler, {"ok": True, "attachment": attachment})
 
     # ------------------------------------------------------------------
     # PUT  (session updates)
@@ -344,12 +429,41 @@ class AssistantApplication:
         parsed = urlparse(handler.path)
 
         # DELETE /api/sessions/<session_id>
-        if parsed.path.startswith("/api/sessions/") and "/messages/" not in parsed.path:
+        if parsed.path.startswith("/api/sessions/") and "/messages/" not in parsed.path and "/attachments/" not in parsed.path:
             session_id = parsed.path.replace("/api/sessions/", "").strip("/")
             if session_id:
-                self.memory_store.delete_session(session_id)
+                attachments = self.memory_store.delete_session(session_id)
+                self.knowledge.cleanup_session(session_id)
+                # Clean up uploaded files from disk
+                for att in attachments:
+                    disk_path = att.get("storage_path", "")
+                    if disk_path and os.path.isfile(disk_path):
+                        try:
+                            os.remove(disk_path)
+                        except OSError:
+                            pass
                 self._send_json(handler, {"ok": True})
                 return
+
+        # DELETE /api/sessions/<session_id>/attachments/<attachment_id>
+        if "/attachments/" in parsed.path and parsed.path.startswith("/api/sessions/"):
+            # e.g. /api/sessions/abc123/attachments/def456
+            parts = parsed.path.replace("/api/sessions/", "").strip("/").split("/attachments/")
+            if len(parts) == 2:
+                session_id, attachment_id = parts[0], parts[1]
+                if session_id and attachment_id:
+                    att_doc = self.memory_store.delete_session_attachment(attachment_id)
+                    if att_doc:
+                        disk_path = att_doc.get("storage_path", "")
+                        if disk_path and os.path.isfile(disk_path):
+                            try:
+                                os.remove(disk_path)
+                            except OSError:
+                                pass
+                        # Invalidate session retriever cache
+                        self.knowledge.cleanup_session(session_id)
+                    self._send_json(handler, {"ok": True})
+                    return
 
         # DELETE /api/messages/<message_id>
         if parsed.path.startswith("/api/messages/"):

@@ -55,6 +55,7 @@ class LLMAssistant:
         preferred_language: str = "default",
         web_search_only: bool = False,
         offline_mode: bool = False,
+        session_id: str | None = None,
     ) -> AssistantResult:
         if not self.settings.current_api_key:
             raise LLMClientError(f"{self.settings.provider_name} API Key is missing. Please check your .env file.")
@@ -71,14 +72,14 @@ class LLMAssistant:
         )
 
         if self.settings.active_provider in ["openrouter", "lm_studio", "ollama"]:
-            return self._chat_openrouter(message, conversation or [], screen_image, instructions, web_search_only, offline_mode)
+            return self._chat_openrouter(message, conversation or [], screen_image, instructions, web_search_only, offline_mode, session_id)
         else:
-            return self._chat_google(message, conversation or [], screen_image, instructions, web_search_only, offline_mode)
+            return self._chat_google(message, conversation or [], screen_image, instructions, web_search_only, offline_mode, session_id)
         
     # ==========================================
     #  OPENROUTER (OPENAI-COMPATIBLE) LOGIC
     # ==========================================
-    def _chat_openrouter(self, message: str, conversation: list[dict[str, str]], screen_image: str | None, instructions: str, web_search_only: bool = False, offline_mode: bool = False) -> AssistantResult:
+    def _chat_openrouter(self, message: str, conversation: list[dict[str, str]], screen_image: str | None, instructions: str, web_search_only: bool = False, offline_mode: bool = False, session_id: str | None = None) -> AssistantResult:
         
         trigger_phrases = ["do you know", "who is", "what is", "tell me about", "give me information on", "details about"]
         lower_msg = message.lower()
@@ -100,7 +101,17 @@ class LLMAssistant:
         current_content.append({"type": "text", "text": message.strip()})
         messages.append({"role": "user", "content": current_content})
 
-        google_tools = build_rest_tools(enable_knowledge=self.knowledge_service is not None, web_search_only=web_search_only, offline_mode=offline_mode)
+        # Determine if session has attachments (enables search_session_docs tool)
+        has_session_docs = False
+        if session_id and self.knowledge_service:
+            has_session_docs = bool(self.memory_store.get_session_attachments(session_id))
+
+        google_tools = build_rest_tools(
+            enable_knowledge=self.knowledge_service is not None and self.knowledge_service.kb_retriever is not None,
+            web_search_only=web_search_only,
+            offline_mode=offline_mode,
+            enable_session_docs=has_session_docs,
+        )
         tools = [{"type": "function", "function": f} for f in google_tools[0]["functionDeclarations"]]
         tool_events: list[dict[str, Any]] = []
 
@@ -190,6 +201,7 @@ class LLMAssistant:
                     name=name,
                     arguments=args,
                     call_id=call_id,
+                    session_id=session_id,
                 )
                 tool_events.append(tool_result.event)
 
@@ -205,9 +217,14 @@ class LLMAssistant:
     # ==========================================
     #  GOOGLE REST API LOGIC
     # ==========================================
-    def _chat_google(self, message: str, conversation: list[dict[str, str]], screen_image: str | None, instructions: str, web_search_only: bool = False, offline_mode: bool = False) -> AssistantResult:
+    def _chat_google(self, message: str, conversation: list[dict[str, str]], screen_image: str | None, instructions: str, web_search_only: bool = False, offline_mode: bool = False, session_id: str | None = None) -> AssistantResult:
         contents = self._build_google_contents(message, conversation, screen_image)
         tool_events: list[dict[str, Any]] = []
+
+        # Determine if session has attachments (enables search_session_docs tool)
+        has_session_docs = False
+        if session_id and self.knowledge_service:
+            has_session_docs = bool(self.memory_store.get_session_attachments(session_id))
 
         if contents and contents[-1]["role"] == "user":
             multi_tool_reminder = (
@@ -219,7 +236,12 @@ class LLMAssistant:
                     contents[-1]["parts"][0]["text"] += multi_tool_reminder
 
         for _ in range(100):
-            response = self._generate_google_content(contents, instructions, web_search_only=web_search_only, offline_mode=offline_mode)
+            response = self._generate_google_content(
+                contents, instructions,
+                web_search_only=web_search_only,
+                offline_mode=offline_mode,
+                enable_session_docs=has_session_docs,
+            )
             function_calls = self._extract_google_function_calls(response)
                 
             if not function_calls:
@@ -240,6 +262,7 @@ class LLMAssistant:
                     name=function_call.get("name", ""),
                     arguments=function_call.get("args") or {},
                     call_id=function_call.get("id"),
+                    session_id=session_id,
                 )
                 tool_events.append(tool_result.event)
                 function_response_parts.append({"functionResponse": tool_result.function_response})
@@ -267,12 +290,17 @@ class LLMAssistant:
         contents.append({"role": "user", "parts": parts})
         return contents
 
-    def _generate_google_content(self, contents: list[dict[str, Any]], instructions: str, web_search_only: bool = False, offline_mode: bool = False) -> dict[str, Any]:
+    def _generate_google_content(self, contents: list[dict[str, Any]], instructions: str, web_search_only: bool = False, offline_mode: bool = False, enable_session_docs: bool = False) -> dict[str, Any]:
         endpoint = API_URL_GOOGLE.format(model=quote(self.settings.ai_model, safe=""))
         payload = {
             "systemInstruction": {"parts": [{"text": instructions}]},
             "contents": contents,
-            "tools": build_rest_tools(enable_knowledge=self.knowledge_service is not None, web_search_only=web_search_only, offline_mode=offline_mode),
+            "tools": build_rest_tools(
+                enable_knowledge=self.knowledge_service is not None and self.knowledge_service.kb_retriever is not None,
+                web_search_only=web_search_only,
+                offline_mode=offline_mode,
+                enable_session_docs=enable_session_docs,
+            ),
             "generationConfig": {"temperature": 0.7},
         }
         request = Request(
