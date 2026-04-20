@@ -14,7 +14,18 @@
 - [backend/tools/knowledge.py](file://backend/tools/knowledge.py)
 - [backend/tools/weather.py](file://backend/tools/weather.py)
 - [backend/tools/news.py](file://backend/tools/news.py)
+- [frontend/index.html](file://frontend/index.html)
+- [frontend/scripts/app.js](file://frontend/scripts/app.js)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Added Smart Hybrid Mode with intelligent model routing capabilities
+- Enhanced operational modes to include dynamic provider switching
+- Updated system prompts and instruction following with hybrid mode awareness
+- Added automatic task complexity classification system
+- Integrated Smart Routing toggle in the frontend UI
+- Enhanced LLM client with dynamic routing logic
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -29,10 +40,10 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-This document describes the AI assistant engine that powers the Orbit Virtual Assistant. It explains the reasoning engine architecture, conversation management, tool orchestration, system prompts, instruction-following mechanisms, and context preservation strategies. It also covers operational modes (simple, copilot, coach), session handling, memory integration, tool calling workflows, function execution patterns, result processing, examples of conversation flows, decision-making processes, error recovery, performance considerations, memory management, and extensibility for adding new capabilities.
+This document describes the AI assistant engine that powers the Orbit Virtual Assistant. It explains the reasoning engine architecture, conversation management, tool orchestration, system prompts, instruction-following mechanisms, and context preservation strategies. The engine now features Smart Hybrid Mode with intelligent model routing, automatic task complexity classification, and dynamic provider switching capabilities. It covers operational modes (simple, copilot, coach), session handling, memory integration, tool calling workflows, function execution patterns, result processing, examples of conversation flows, decision-making processes, error recovery, performance considerations, memory management, and extensibility for adding new capabilities.
 
 ## Project Structure
-The assistant is organized into a backend server, provider-agnostic LLM clients, a reasoning brain module, a MongoDB-backed memory store, and tool integrations for web search, knowledge (RAG), weather, and news.
+The assistant is organized into a backend server, provider-agnostic LLM clients, a reasoning brain module, a MongoDB-backed memory store, and tool integrations for web search, knowledge (RAG), weather, and news. The system now includes Smart Hybrid Mode with dynamic routing capabilities.
 
 ```mermaid
 graph TB
@@ -41,6 +52,7 @@ FE_Index["index.html"]
 FE_App["app.js"]
 FE_Assets["styles.css"]
 FE_Avatar["avatar-renderer.js / avatar-worker.js"]
+FE_Routing["Smart Routing Toggle"]
 end
 subgraph "Backend"
 Server["server.py"]
@@ -58,6 +70,7 @@ FE_Index --> Server
 FE_App --> Server
 FE_Assets --> Server
 FE_Avatar --> Server
+FE_Routing --> Server
 Server --> LLMClient
 Server --> Memory
 Server --> Tools_KB
@@ -86,18 +99,20 @@ GeminiClient --> Tools_News
 - [backend/tools/knowledge.py:88-140](file://backend/tools/knowledge.py#L88-L140)
 - [backend/tools/weather.py:48-75](file://backend/tools/weather.py#L48-L75)
 - [backend/tools/news.py:22-60](file://backend/tools/news.py#L22-L60)
+- [frontend/index.html:156-160](file://frontend/index.html#L156-L160)
 
 **Section sources**
 - [README.md:164-201](file://README.md#L164-L201)
 - [backend/server.py:23-63](file://backend/server.py#L23-L63)
 
 ## Core Components
-- Configuration and settings loader: centralizes environment variables and provider/model selection.
-- HTTP server and API endpoints: serves frontend, exposes session/message/tool endpoints, and orchestrates chat.
-- LLM clients: provider-agnostic chat logic for Google, OpenRouter, LM Studio, and Ollama.
-- Reasoning brain: constructs system prompts, declares tools, and dispatches tool calls.
+- Configuration and settings loader: centralizes environment variables and provider/model selection, now includes hybrid mode settings.
+- HTTP server and API endpoints: serves frontend, exposes session/message/tool endpoints, and orchestrates chat with routing mode support.
+- LLM clients: provider-agnostic chat logic for Google, OpenRouter, LM Studio, and Ollama with dynamic routing capabilities.
+- Reasoning brain: constructs system prompts, declares tools, and dispatches tool calls with hybrid mode awareness.
 - Memory store: MongoDB-backed persistence for sessions, messages, profile, tasks, notes, and caches.
 - Tools: web search (Tavily + DuckDuckGo), knowledge base (RAG), weather, and news.
+- Smart Hybrid Mode: intelligent model routing with automatic task complexity classification and dynamic provider switching.
 
 **Section sources**
 - [backend/config.py:55-76](file://backend/config.py#L55-L76)
@@ -111,7 +126,7 @@ GeminiClient --> Tools_News
 - [backend/tools/news.py:22-60](file://backend/tools/news.py#L22-L60)
 
 ## Architecture Overview
-The assistant runs a threaded HTTP server that exposes REST endpoints. The chat flow delegates to an LLM client based on the selected provider. The client builds a system instruction and message history, invokes the LLM with function-declared tools, executes tool calls via the brain dispatcher, persists tool events and results in memory, and returns a final reply with tool events.
+The assistant runs a threaded HTTP server that exposes REST endpoints with Smart Hybrid Mode support. The chat flow delegates to an LLM client based on the selected provider and routing mode. The client builds a system instruction and message history, performs automatic task complexity classification, dynamically selects appropriate models/providers, invokes the LLM with function-declared tools, executes tool calls via the brain dispatcher, persists tool events and results in memory, and returns a final reply with tool events.
 
 ```mermaid
 sequenceDiagram
@@ -121,8 +136,10 @@ participant LLM as "LLMAssistant"
 participant Brain as "build_system_instruction/run_tool_call"
 participant Tools as "Weather/News/Web/Knowledge"
 participant Mem as "MemoryStore"
-Client->>Server : POST /api/chat {message, conversation, mode, ...}
-Server->>LLM : chat(message, conversation, mode, ...)
+Client->>Server : POST /api/chat {message, conversation, mode, routingMode, ...}
+Server->>LLM : chat(message, conversation, mode, routingMode, ...)
+LLM->>LLM : classify_task_complexity(message)
+LLM->>LLM : select_target_provider(model)
 LLM->>Brain : build_system_instruction(...)
 LLM->>LLM : prepare messages + tools
 LLM->>LLM : send request to provider
@@ -147,12 +164,41 @@ Server-->>Client : JSON response
 
 ## Detailed Component Analysis
 
+### Smart Hybrid Mode and Dynamic Routing
+- **Task Complexity Classification**: Automatic classification of user tasks into "simple" or "complex" categories based on message length (>800 characters) and keyword analysis (analyze, optimize, refactor, architect, explain code, calculate, prove, derive, logic).
+- **Dynamic Provider Switching**: When routing mode is "dynamic" and hybrid mode is enabled, complex tasks automatically switch from the default provider/model to the hybrid provider/model.
+- **Automatic Model Upgrade**: Complex tasks trigger automatic upgrade to higher-capability models (e.g., GPT-4o) while simple tasks use the default model for cost efficiency.
+- **Fallback Handling**: If hybrid mode is disabled but dynamic routing is requested, the system falls back to using the default provider/model.
+
+```mermaid
+flowchart TD
+Start(["Task Received"]) --> Classify["Classify Task Complexity"]
+Classify --> Simple{"Simple Task?"}
+Simple --> |Yes| UseDefault["Use Default Provider/Model"]
+Simple --> |No| CheckHybrid{"Hybrid Mode Enabled?"}
+CheckHybrid --> |Yes| Switch["Switch to Hybrid Provider/Model"]
+CheckHybrid --> |No| UseDefault
+Switch --> Route["Route to Hybrid Provider"]
+UseDefault --> Route
+Route --> Process["Process Task"]
+Process --> End(["Return Response"])
+```
+
+**Diagram sources**
+- [backend/api_clients/llm_client.py:59-101](file://backend/api_clients/llm_client.py#L59-L101)
+
+**Section sources**
+- [backend/api_clients/llm_client.py:59-101](file://backend/api_clients/llm_client.py#L59-L101)
+- [backend/api_clients/llm_client.py:84-87](file://backend/api_clients/llm_client.py#L84-L87)
+- [backend/server.py:38](file://backend/server.py#L38)
+
 ### System Prompts and Instruction Following
 - Base system prompt defines the assistant persona and rules.
 - Mode-specific prompts tailor behavior for simple, copilot, and coach modes.
 - Search-mode annotations adjust tool availability and bias when toggled (web search only, offline).
 - Language hints influence response language preferences.
 - Recent conversation and memory brief snapshots are injected to preserve context.
+- **Hybrid Mode Awareness**: System instructions now account for dynamic routing capabilities and provider switching.
 
 ```mermaid
 flowchart TD
@@ -163,7 +209,8 @@ SearchMode --> |No| Keep["Keep default tool set"]
 Bias --> Lang["Apply language hint"]
 Keep --> Lang
 Lang --> Snapshot["Build memory brief + recent conversation snapshot"]
-Snapshot --> Inject["Inject into system instruction"]
+Snapshot --> Hybrid["Check Hybrid Mode Status"]
+Hybrid --> Inject["Inject into system instruction"]
 Inject --> End(["Return instruction"])
 ```
 
@@ -179,6 +226,7 @@ Inject --> End(["Return instruction"])
 - Simple mode: concise answers, minimal memory usage.
 - Copilot mode: proactive planning, screen-aware suggestions, deeper memory.
 - Coach mode: expert tutoring with RAG-driven quizzes and roadmaps.
+- **Smart Hybrid Mode**: Intelligent model routing with automatic task complexity classification and dynamic provider switching.
 - Context preservation: recent conversation snapshot and memory brief injected into the system instruction; session-scoped document search enabled when attachments exist.
 
 **Section sources**
@@ -192,7 +240,8 @@ Inject --> End(["Return instruction"])
   - Web search only: both web and local tools available; system prompt biases toward web.
   - Offline: web tool stripped; only local tools usable.
   - Session docs: enabled when session has attachments.
-- Tool dispatcher executes tools and records events; results are appended to the conversation to guide the LLM’s final answer.
+- Tool dispatcher executes tools and records events; results are appended to the conversation to guide the LLM's final answer.
+- **Dynamic Routing Integration**: Tool calls are executed through the selected provider/model based on task complexity classification.
 
 ```mermaid
 flowchart TD
@@ -377,12 +426,14 @@ SESSION_ATTACHMENTS ||--o{ SESSION_CHUNKS : "indexes"
 - LLMAssistant: provider-agnostic chat with two paths:
   - Google REST API: constructs contents, extracts function calls, executes tools, and returns replies.
   - OpenRouter/LM Studio/Ollama: constructs messages with tools, handles tool calls, and returns replies.
+  - **Dynamic Routing**: Automatic task complexity classification and provider/model switching based on routing mode.
 - GeminiAssistant: legacy client for Google Gemini with similar orchestration.
 
 ```mermaid
 classDiagram
 class LLMAssistant {
-+chat(message, conversation, screen_image, mode, ...)
++chat(message, conversation, screen_image, mode, routing_mode, ...)
+-_classify_task_complexity(message)
 -_chat_google(...)
 -_chat_openrouter(...)
 }
@@ -414,7 +465,7 @@ GeminiAssistant --> "uses" run_tool_call
 - Static file serving for frontend assets.
 - Session endpoints: create, list, get, update, delete; messages CRUD; attachments CRUD.
 - Weather and news endpoints: fetch and cache results; update memory state.
-- Chat endpoint: validates inputs, delegates to LLMAssistant, and returns reply plus tool events and memory snapshot.
+- Chat endpoint: validates inputs, delegates to LLMAssistant with routing mode support, and returns reply plus tool events and memory snapshot.
 
 **Section sources**
 - [backend/server.py:85-167](file://backend/server.py#L85-L167)
@@ -422,10 +473,24 @@ GeminiAssistant --> "uses" run_tool_call
 - [backend/server.py:276-321](file://backend/server.py#L276-L321)
 - [backend/server.py:329-394](file://backend/server.py#L329-L394)
 
+### Smart Routing UI Integration
+- **Smart Routing Toggle**: Frontend toggle chip that enables/disables dynamic routing mode.
+- **Routing Mode Parameter**: Passes routingMode parameter ("dynamic" or "fixed") to the backend.
+- **Hybrid Mode Detection**: UI detects if hybrid mode is enabled in the backend configuration.
+- **Visual Feedback**: Toggle indicates when Smart Routing is active and available.
+
+**Section sources**
+- [frontend/index.html:156-160](file://frontend/index.html#L156-L160)
+- [frontend/scripts/app.js:113](file://frontend/scripts/app.js#L113)
+- [frontend/scripts/app.js:409](file://frontend/scripts/app.js#L409)
+- [frontend/scripts/app.js:974](file://frontend/scripts/app.js#L974)
+- [frontend/scripts/app.js:1081](file://frontend/scripts/app.js#L1081)
+
 ## Dependency Analysis
 - Coupling: server depends on LLM client, memory store, and tools; LLM client depends on brain and tools; brain depends on memory store and tools.
 - Cohesion: each module encapsulates a single concern (configuration, server, brain, memory, tools).
 - External dependencies: MongoDB, provider APIs, LangChain ecosystem for RAG, web search providers.
+- **Hybrid Mode Dependencies**: Additional complexity classification logic and dynamic routing infrastructure.
 
 ```mermaid
 graph LR
@@ -466,8 +531,8 @@ Brain --> Tools_News
 - Session retriever caching: invalidated on attachment changes to avoid stale results.
 - MongoDB indexes: ensure efficient queries on sessions, messages, and retrievers.
 - Attachment upload limits: size and type checks prevent oversized or unsupported files.
-
-[No sources needed since this section provides general guidance]
+- **Smart Hybrid Mode Optimization**: Automatic task complexity classification prevents unnecessary expensive model usage for simple tasks.
+- **Dynamic Routing Efficiency**: Provider switching only occurs for complex tasks, optimizing cost and performance.
 
 ## Troubleshooting Guide
 - API key missing: provider-specific exceptions raised when API key is absent.
@@ -475,6 +540,8 @@ Brain --> Tools_News
 - Tool errors: WeatherError, NewsError, and ValueError propagated with clear messages.
 - Unsupported features: Graceful refusal messages returned for unsupported endpoints.
 - Connection failures: MongoDB connection failure raises runtime error with guidance.
+- **Hybrid Mode Issues**: Missing hybrid provider configuration or disabled hybrid mode when dynamic routing is requested.
+- **Task Classification Errors**: Complex keyword detection may need adjustment for specific use cases.
 
 **Section sources**
 - [backend/api_clients/llm_client.py:60-61](file://backend/api_clients/llm_client.py#L60-L61)
@@ -486,20 +553,23 @@ Brain --> Tools_News
 - [backend/core/memory_store.py:94-98](file://backend/core/memory_store.py#L94-L98)
 
 ## Conclusion
-The Orbit Virtual Assistant engine integrates a flexible provider-agnostic LLM client, a robust reasoning brain with precise system prompts and tool orchestration, and a MongoDB-backed memory store with multi-session support. It balances performance and safety with explicit anti-hallucination rules, controlled tool usage, and graceful fallbacks. Extensibility is straightforward: add new tools, adjust prompts, and integrate new providers through the existing client abstraction.
-
-[No sources needed since this section summarizes without analyzing specific files]
+The Orbit Virtual Assistant engine integrates a flexible provider-agnostic LLM client, a robust reasoning brain with precise system prompts and tool orchestration, and a MongoDB-backed memory store with multi-session support. The new Smart Hybrid Mode adds intelligent model routing capabilities with automatic task complexity classification and dynamic provider switching, enhancing both performance and cost efficiency. It balances performance and safety with explicit anti-hallucination rules, controlled tool usage, and graceful fallbacks. Extensibility is straightforward: add new tools, adjust prompts, integrate new providers through the existing client abstraction, and leverage the dynamic routing system for optimal resource utilization.
 
 ## Appendices
+
+### Smart Hybrid Mode Configuration
+- **Enable Hybrid Mode**: Configurable via CLI during startup with `enable_hybrid` setting.
+- **Hybrid Provider/Model**: Separate provider and model configuration for complex tasks.
+- **Routing Modes**: Fixed (default) or Dynamic (automatic routing based on task complexity).
+- **Task Classification**: Automatic determination of simple vs complex tasks using keywords and length thresholds.
 
 ### Example Conversation Flows
 - Simple mode: concise answer to a single query; minimal tool usage.
 - Copilot mode: proactive suggestion with plan; uses memory and tasks.
 - Coach mode: RAG-powered quiz with local knowledge; enforces tool usage for facts.
+- **Smart Hybrid Mode**: Automatically routes complex tasks to higher-capability providers while keeping simple tasks on default models.
 - Web search only: prefers web search; still allows local knowledge when relevant.
 - Offline mode: strips web tool; relies on local knowledge and memory.
-
-[No sources needed since this section provides conceptual examples]
 
 ### Extensibility Guidelines
 - Adding a new tool:
@@ -510,8 +580,11 @@ The Orbit Virtual Assistant engine integrates a flexible provider-agnostic LLM c
 - Adding a new provider:
   - Extend LLM client with provider-specific request/response handling.
   - Adjust tool availability and system instruction injection.
+  - Configure hybrid provider settings if desired.
 - Enhancing RAG:
   - Integrate new document loaders and chunkers.
   - Tune retriever configuration and hybrid strategies.
-
-[No sources needed since this section provides general guidance]
+- **Smart Hybrid Mode Enhancement**:
+  - Extend task complexity classification with additional keywords or criteria.
+  - Configure multiple hybrid provider/model combinations for different task types.
+  - Implement custom routing logic for specialized use cases.

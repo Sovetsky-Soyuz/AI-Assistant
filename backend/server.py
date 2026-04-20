@@ -21,7 +21,6 @@ from .tools.weather import WeatherError, WeatherService
 from .tools.web_search import WebSearchService
 from .tools.knowledge import KnowledgeService
 
-# --- Pydantic Models for Data Validation ---
 class ChatRequest(BaseModel):
     message: str
     conversation: Optional[List[dict]] = []
@@ -38,33 +37,22 @@ class ChatRequest(BaseModel):
     providerOverride: Optional[str] = None
     modelOverride: Optional[str] = None
 
-class ProfileUpdate(BaseModel):
-    displayName: Optional[str] = None
-    location: Optional[str] = None
-    routine: Optional[str] = None
-
-class TaskRequest(BaseModel):
-    title: str
-    priority: Optional[str] = "medium"
-    dueDate: Optional[str] = None
-
-class NoteRequest(BaseModel):
-    text: str
-    category: Optional[str] = "note"
-
-class AttachmentUpload(BaseModel):
-    filename: str
-    data: str  # Base64 string
-
 class SessionCreateRequest(BaseModel):
     title: Optional[str] = None
     firstMessage: Optional[str] = None 
 
-# --- Initialize Application ---
+class SessionUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    pinned: Optional[bool] = None
+    archived: Optional[bool] = None
+
+class AttachmentUpload(BaseModel):
+    filename: str
+    data: str
+
 app = FastAPI(title="Orbit Virtual Assistant API")
 settings = get_settings()
 
-# Global service variables (Initialized after user CLI selection)
 memory_store: MemoryStore = None
 knowledge: KnowledgeService = None
 web_search: WebSearchService = None
@@ -73,46 +61,29 @@ weather_svc: WeatherService = None
 news_svc: NewsService = None
 
 def init_services(current_settings: Settings, rag_path: str | None = None):
-    """Initializes all backend services based on user's CLI choices."""
     global memory_store, knowledge, web_search, assistant, weather_svc, news_svc, settings
     settings = current_settings
 
-    # Initialize MemoryStore with migration check
     legacy_json = settings.data_dir / "assistant_memory.json"
     legacy_history = settings.data_dir / "chat_history.json"
 
     if legacy_json.exists():
         print("[*] Legacy JSON files detected -- migrating to MongoDB...")
         memory_store = MemoryStore.migrate_from_json(
-            json_path=legacy_json,
-            history_path=legacy_history if legacy_history.exists() else None,
-            mongodb_uri=settings.mongodb_uri,
-            db_name=settings.mongodb_db,
+            json_path=legacy_json, history_path=legacy_history if legacy_history.exists() else None,
+            mongodb_uri=settings.mongodb_uri, db_name=settings.mongodb_db,
         )
         legacy_json.rename(legacy_json.with_suffix(".json.bak"))
         if legacy_history.exists():
             legacy_history.rename(legacy_history.with_suffix(".json.bak"))
-        print("[*] Migration complete. Legacy files renamed to .json.bak")
     else:
-        memory_store = MemoryStore(
-            mongodb_uri=settings.mongodb_uri,
-            db_name=settings.mongodb_db,
-        )
+        memory_store = MemoryStore(mongodb_uri=settings.mongodb_uri, db_name=settings.mongodb_db)
 
-    # Initialize Knowledge Service (RAG)
-    knowledge = KnowledgeService(
-        memory_store=memory_store,
-        docs_dir=rag_path,
-        upload_dir=str(settings.data_dir / "uploads"),
-    )
-
-    # Initialize other services
+    knowledge = KnowledgeService(memory_store=memory_store, docs_dir=rag_path, upload_dir=str(settings.data_dir / "uploads"))
     web_search = WebSearchService()
     assistant = LLMAssistant(settings, memory_store, knowledge, web_search)
     weather_svc = WeatherService(settings.default_location)
     news_svc = NewsService()
-
-# --- API Endpoints ---
 
 @app.get("/api/state")
 async def get_state():
@@ -125,30 +96,21 @@ async def get_state():
         "memory": memory_store.get_state(),
         "history": memory_store.get_history(),
         "sessions": memory_store.get_sessions(include_archived=True),
-        "enableHybrid": settings.enable_hybrid,
+        "enableHybrid": getattr(settings, 'enable_hybrid', False),
     }
 
-
-# --- Session Management ---
 @app.get("/api/sessions")
 async def get_sessions(include_archived: bool = False):
     return {"sessions": memory_store.get_sessions(include_archived)}
 
-# @app.post("/api/sessions")
-# async def create_session(payload: dict):
-#     session = memory_store.create_session(title=payload.get("title"))
-#     return {"ok": True, "session": session}
-
 @app.post("/api/sessions")
 async def create_session(payload: SessionCreateRequest):
     title = payload.title
-    
     if payload.firstMessage and not title:
         try:
             title = assistant.generate_title(payload.firstMessage)
         except Exception:
             title = "New Chat"
-
     session = memory_store.create_session(title=title or "New Chat")
     return {"ok": True, "session": session}
 
@@ -158,12 +120,27 @@ async def get_messages(session_id: str, limit: int = 0):
 
 @app.post("/api/sessions/{session_id}/messages")
 async def add_message(session_id: str, payload: dict):
-    message = memory_store.add_message(
-        session_id=session_id,
-        role=payload.get("role", "user"),
-        text=payload.get("text", ""),
-    )
-    return {"ok": True, "message": message}
+    try:
+        message = memory_store.add_message(session_id=session_id, role=payload.get("role", "user"), text=payload.get("text", ""))
+        return {"ok": True, "message": message}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+@app.put("/api/sessions/{session_id}")
+async def update_session(session_id: str, payload: SessionUpdateRequest):
+    kwargs = {}
+    if payload.title is not None:
+        kwargs["title"] = payload.title
+    if payload.pinned is not None:
+        kwargs["pinned"] = payload.pinned
+    if payload.archived is not None:
+        kwargs["archived"] = payload.archived
+    
+    try:
+        session = memory_store.update_session(session_id, **kwargs)
+        return {"ok": True, "session": session}
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 @app.delete("/api/sessions/{session_id}")
 async def delete_session(session_id: str):
@@ -172,22 +149,22 @@ async def delete_session(session_id: str):
     for att in attachments:
         path = att.get("storage_path")
         if path and os.path.isfile(path):
-            try:
-                os.remove(path)
-            except OSError:
-                pass
+            try: os.remove(path)
+            except OSError: pass
     return {"ok": True}
 
-# --- AI Chat ---
+# --- EXACT OLD LOGIC FOR CHAT (Non-Streaming JSON Return) ---
 @app.post("/api/chat")
 async def handle_chat(payload: ChatRequest):
     UNSUPPORTED_REFUSAL = "Sorry, I don't have this function. Please use other LLMs that support this."
+    used_model = payload.modelOverride or settings.ai_model
     
     if payload.imageGen:
-        return {"reply": UNSUPPORTED_REFUSAL, "toolEvents": [], "memory": memory_store.get_state()}
+        return {"reply": UNSUPPORTED_REFUSAL, "toolEvents": [], "memory": memory_store.get_state(), "model": used_model}
 
     try:
-        result = assistant.chat(
+        # TỪ KHÓA AWAIT QUAN TRỌNG: Đợi LLM suy nghĩ xong 100% rồi mới chạy tiếp
+        result = await assistant.chat(
             message=payload.message,
             conversation=payload.conversation,
             screen_image=payload.screenImage,
@@ -202,9 +179,6 @@ async def handle_chat(payload: ChatRequest):
             override_provider=payload.providerOverride,
             override_model=payload.modelOverride
         )
-        
-        used_model = payload.modelOverride or settings.ai_model
-        
         return {
             "reply": result.reply,
             "toolEvents": result.tool_events,
@@ -214,7 +188,6 @@ async def handle_chat(payload: ChatRequest):
     except LLMClientError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
-# --- Tools ---
 @app.get("/api/weather")
 async def get_weather(location: Optional[str] = ""):
     try:
@@ -233,61 +206,43 @@ async def get_news(topic: Optional[str] = ""):
     except NewsError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-# --- File Attachments ---
 @app.post("/api/sessions/{session_id}/attachments")
 async def upload_attachment(session_id: str, payload: AttachmentUpload):
     try:
         file_bytes = base64.b64decode(payload.data)
         safe_name = f"{session_id}_{payload.filename}"
         disk_path = os.path.join(knowledge.upload_dir, safe_name)
-        
-        with open(disk_path, "wb") as f:
-            f.write(file_bytes)
+        with open(disk_path, "wb") as f: f.write(file_bytes)
 
         attachment = memory_store.add_session_attachment(
-            session_id=session_id,
-            filename=payload.filename,
+            session_id=session_id, filename=payload.filename,
             file_type=os.path.splitext(payload.filename)[1].lower(),
-            file_size=len(file_bytes),
-            storage_path=disk_path,
+            file_size=len(file_bytes), storage_path=disk_path,
         )
-
-        chunk_count = knowledge.index_session_file(
-            session_id=session_id,
-            attachment_id=attachment["attachment_id"],
-            file_path=disk_path,
-            filename=payload.filename,
-        )
+        chunk_count = knowledge.index_session_file(session_id=session_id, attachment_id=attachment["attachment_id"], file_path=disk_path, filename=payload.filename)
         attachment["chunk_count"] = chunk_count
         return {"ok": True, "attachment": attachment}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# --- Serve Static Files (Frontend) ---
 @app.get("/")
-async def serve_index():
-    return FileResponse(settings.web_dir / "index.html")
+async def serve_index(): return FileResponse(settings.web_dir / "index.html")
 
 @app.get("/styles.css")
-async def serve_styles():
-    return FileResponse(settings.web_dir / "assets" / "styles.css")
+async def serve_styles(): return FileResponse(settings.web_dir / "assets" / "styles.css")
 
 @app.get("/app.js")
-async def serve_app_js():
-    return FileResponse(settings.web_dir / "scripts" / "app.js")
+async def serve_app_js(): return FileResponse(settings.web_dir / "scripts" / "app.js")
 
 @app.get("/avatar-worker.js")
-async def serve_avatar_worker():
-    return FileResponse(settings.web_dir / "scripts" / "avatar-worker.js")
+async def serve_avatar_worker(): return FileResponse(settings.web_dir / "scripts" / "avatar-worker.js")
 
 @app.get("/avatar-renderer.js")
-async def serve_avatar_renderer():
-    return FileResponse(settings.web_dir / "scripts" / "avatar-renderer.js")
+async def serve_avatar_renderer(): return FileResponse(settings.web_dir / "scripts" / "avatar-renderer.js")
 
 app.mount("/assets", StaticFiles(directory=settings.web_dir / "assets"), name="assets")
 app.mount("/scripts", StaticFiles(directory=settings.web_dir / "scripts"), name="scripts")
 
-# --- Startup & CLI Configuration ---
 def run() -> None:
     current_settings = get_settings()
 
@@ -314,11 +269,10 @@ def run() -> None:
 
     print(f"--- Running with Default Provider: {current_settings.active_provider.upper()} ({current_settings.ai_model}) ---")
 
-    # NEW: HYBRID MODE PROMPT
     use_hybrid = input("Do you want to enable Hybrid Mode (Multi-model smart routing)? (y/n) [n]: ").strip().lower()
     if use_hybrid in ['y', 'yes']:
         current_settings = dataclasses.replace(current_settings, enable_hybrid=True)
-        print(f"[*] Hybrid Mode ENABLED. Complex tasks can be routed to: {current_settings.hybrid_provider.upper()} ({current_settings.hybrid_model})")
+        print(f"[*] Hybrid Mode ENABLED. Complex tasks can be routed to: {getattr(current_settings, 'hybrid_provider', 'openrouter').upper()} ({getattr(current_settings, 'hybrid_model', 'openai/gpt-4o')})")
     else:
         print("[*] Hybrid Mode DISABLED. Single model will be used for all tasks.")
 
@@ -329,16 +283,13 @@ def run() -> None:
         default_path = current_settings.rag_docs_path or str(current_settings.root_dir / "knowledge_base")
         user_path = input(f"Enter the path to your local documents (default: {default_path}): ").strip()
         rag_path = user_path if user_path else default_path
-
         print(f"Connecting to LM Studio and initializing the Vector Database....")
         print(f"RAG will be enabled with documents from: {rag_path}")
     else:
         print("RAG will be disabled. The assistant will not have access to local documents.")
 
-    # Initialize all components with the user's choices
     init_services(current_settings, rag_path)
 
-    # Start FastAPI server
     print(f"Orbit Assistant is starting on http://127.0.0.1:{current_settings.assistant_port}")
     uvicorn.run(app, host="127.0.0.1", port=current_settings.assistant_port)
 

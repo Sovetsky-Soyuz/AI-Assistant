@@ -1,6 +1,5 @@
 // ===========================================
 // ORBIT VIRTUAL ASSISTANT - app.js
-// Phase 2: Frontend Logic for ChatGPT-style UI
 // ===========================================
 
 const VOICE_LANGUAGE_OPTIONS = [
@@ -18,6 +17,23 @@ const VOICE_LANGUAGE_OPTIONS = [
   { value: "id-ID", label: "Indonesian" },
 ];
 
+const SUPPORTED_FILE_EXTS = [".pdf", ".docx", ".doc", ".txt", ".md", ".csv", ".json"];
+
+const SESSION_MENU_ICONS = {
+  rename:
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
+  pin:
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>',
+  unpin:
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>',
+  archive:
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>',
+  unarchive:
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 10 12 7 15 10"></polyline><line x1="12" y1="7" x2="12" y2="21"></line></svg>',
+  delete:
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
+};
+
 function createEmptyTurn(source = "text") {
   return {
     source,
@@ -30,11 +46,10 @@ function createEmptyTurn(source = "text") {
   };
 }
 
-// ---------- Markdown Configuration ----------
+// ---------- Markdown Configuration (FIXED FOR MARKED V13+ & COPY BUTTON) ----------
 if (typeof marked !== "undefined") {
   const renderer = new marked.Renderer();
   
-  // Override code block rendering to inject a Copy button
   renderer.code = function(tokenOrCode, language) {
     const codeText = typeof tokenOrCode === 'string' ? tokenOrCode : (tokenOrCode.text || "");
     const lang = typeof tokenOrCode === 'string' ? language : (tokenOrCode.lang || "");
@@ -62,7 +77,6 @@ if (typeof marked !== "undefined") {
 // ---------- Application State ----------
 
 const appState = {
-  // Chat & mode
   mode: "simple",
   coachTopic: window.localStorage.getItem("orbit_coach_topic") || "",
   coachLevel: window.localStorage.getItem("orbit_coach_level") || "",
@@ -71,18 +85,12 @@ const appState = {
   memory: null,
   currentTurn: null,
   recentToolEvents: [],
-
-  // Session management
   activeSessionId: null,
   sessions: [],
   isProcessing: false,
-
-  // Screen sharing
   latestScreenImage: null,
   screenStream: null,
   captureIntervalId: null,
-
-  // Voice
   voiceEnabled: false,
   speechRecognition: null,
   speechSupported: false,
@@ -95,18 +103,10 @@ const appState = {
   liveVoiceTranscript: "",
   liveVoiceName: "Kore",
   silenceTimeoutId: null,
-
-  // Dual voice mode: Mode A (Ctrl+M, review-then-send) vs Mode B (hold Control, instant send)
   modeAActive: false,
-
-  // Avatar
   stageWorker: null,
-
-  // UI panel state
   sidebarOpen: window.localStorage.getItem("orbit_sidebar_open") !== "false",
   drawerOpen: false,
-
-  // Composer toggle states
   webSearchActive: false,
   thinkingActive: false,
   imageGenActive: false,
@@ -114,15 +114,10 @@ const appState = {
   routingActive: false,
 };
 
-// ---------- DOM Element References ----------
-
 const elements = {
-  // Layout
   appLayout: document.getElementById("appLayout"),
   sidebar: document.getElementById("sidebar"),
   chatMain: document.getElementById("chatMain"),
-
-  // Sidebar controls
   newChatBtn: document.getElementById("newChatBtn"),
   sidebarCollapseBtn: document.getElementById("sidebarCollapseBtn"),
   sidebarOpenBtn: document.getElementById("sidebarOpenBtn"),
@@ -131,102 +126,72 @@ const elements = {
   recentChats: document.getElementById("recentChats"),
   archivedChatsGroup: document.getElementById("archivedChatsGroup"),
   archivedChats: document.getElementById("archivedChats"),
-
-  // Header
   apiStatus: document.getElementById("apiStatus"),
   modelBadge: document.getElementById("modelBadge"),
   runtimeBadge: document.getElementById("runtimeBadge"),
   todayLabel: document.getElementById("todayLabel"),
-
-  // Mode switch
   modeButtons: Array.from(document.querySelectorAll(".mode-button")),
-
-  // Avatar
   avatarStage: document.getElementById("avatarStage"),
   stageStatus: document.getElementById("stageStatus"),
   stageCopy: document.getElementById("stageCopy"),
-
-  // Session actions
   pinChatBtn: document.getElementById("pinChatBtn"),
   archiveChatBtn: document.getElementById("archiveChatBtn"),
   deleteChatBtn: document.getElementById("deleteChatBtn"),
-
-  // Utility drawer
   utilityToggleBtn: document.getElementById("utilityToggleBtn"),
   utilityCloseBtn: document.getElementById("utilityCloseBtn"),
   utilityDrawer: document.getElementById("utilityDrawer"),
-
-  // Coach panel
   coachPanel: document.getElementById("coachPanel"),
   coachTopicInput: document.getElementById("coachTopicInput"),
   coachLevelInput: document.getElementById("coachLevelInput"),
   coachModeCopy: document.getElementById("coachModeCopy"),
   conversationLanguageSelect: document.getElementById("conversationLanguageSelect"),
-
-  // Messages
   messageList: document.getElementById("messageList"),
   toolEvents: document.getElementById("toolEvents"),
-
-  // Composer
   composer: document.getElementById("composer"),
   messageInput: document.getElementById("messageInput"),
   sendButton: document.getElementById("sendButton"),
   attachScreenToggle: document.getElementById("attachScreenToggle"),
   composerVoiceStatus: document.getElementById("composerVoiceStatus"),
-
-  // Composer toggle chips
   attachFilesBtn: document.getElementById("attachFilesBtn"),
   createImageBtn: document.getElementById("createImageBtn"),
   thinkingToggle: document.getElementById("thinkingToggle"),
   webSearchToggle: document.getElementById("webSearchToggle"),
   offlineToggle: document.getElementById("offlineToggle"),
   routingToggle: document.getElementById("routingToggle"),
-
-  // Mic
   micButton: document.getElementById("micButton"),
   voiceToggle: document.getElementById("voiceToggle"),
   voiceStatus: document.getElementById("voiceStatus"),
   voiceLanguageSelect: document.getElementById("voiceLanguageSelect"),
-
-  // Quick actions & practice
   quickActions: Array.from(document.querySelectorAll(".ghost-button[data-prompt]")),
   practiceButtons: Array.from(document.querySelectorAll(".practice-button")),
-
-  // Screen sharing
   screenPreview: document.getElementById("screenPreview"),
   screenVideo: document.getElementById("screenVideo"),
   startShareButton: document.getElementById("startShareButton"),
   stopShareButton: document.getElementById("stopShareButton"),
-
-  // Profile
   profileForm: document.getElementById("profileForm"),
   displayNameInput: document.getElementById("displayNameInput"),
   locationInput: document.getElementById("locationInput"),
   routineInput: document.getElementById("routineInput"),
-
-  // Weather & News
   refreshWeatherButton: document.getElementById("refreshWeatherButton"),
   weatherCard: document.getElementById("weatherCard"),
   refreshNewsButton: document.getElementById("refreshNewsButton"),
   newsCard: document.getElementById("newsCard"),
-
-  // Tasks
   taskForm: document.getElementById("taskForm"),
   taskTitleInput: document.getElementById("taskTitleInput"),
   taskPriorityInput: document.getElementById("taskPriorityInput"),
   taskDueDateInput: document.getElementById("taskDueDateInput"),
   taskList: document.getElementById("taskList"),
-
-  // Memory
   memoryHint: document.getElementById("memoryHint"),
   notesList: document.getElementById("notesList"),
   noteForm: document.getElementById("noteForm"),
   noteTextInput: document.getElementById("noteTextInput"),
   noteCategoryInput: document.getElementById("noteCategoryInput"),
   fileAttachInput: document.getElementById("fileAttachInput"),
-};
 
-// ---------- Initialization ----------
+  chatSettingsBtn: document.getElementById("chatSettingsBtn"),
+  chatSettingsDropdown: document.getElementById("chatSettingsDropdown"),
+  renameChatBtn: document.getElementById("renameChatBtn"),
+};
 
 document.addEventListener("DOMContentLoaded", async () => {
   initializeFormValues();
@@ -238,16 +203,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupSpeechRecognition();
   restoreSidebarState();
   setStageState("idle", "Idle", "Orbit Virtual Assistant is running.");
-  addMessage(
-    "system",
-    "Orbit Virtual Assistant is ready. Type a message, hold Control to talk, or press Ctrl+M to record and review."
-  );
+  addMessage("system", "Orbit Virtual Assistant is ready. Type a message, hold Control to talk, or press Ctrl+M to record and review.");
   await refreshState();
 });
 
 function initializeFormValues() {
   const voiceValue = window.localStorage.getItem("orbit_voice_language") || "default";
-
   if (elements.voiceLanguageSelect) elements.voiceLanguageSelect.innerHTML = "";
   if (elements.conversationLanguageSelect) elements.conversationLanguageSelect.innerHTML = "";
 
@@ -259,7 +220,6 @@ function initializeFormValues() {
       voiceNode.selected = option.value === voiceValue;
       elements.voiceLanguageSelect.appendChild(voiceNode);
     }
-
     if (elements.conversationLanguageSelect) {
       const conversationNode = document.createElement("option");
       conversationNode.value = option.value;
@@ -269,147 +229,83 @@ function initializeFormValues() {
     }
   });
 
-  if (elements.coachTopicInput) {
-    elements.coachTopicInput.value = appState.coachTopic;
-  }
-  if (elements.coachLevelInput) {
-    elements.coachLevelInput.value = appState.coachLevel;
-  }
+  if (elements.coachTopicInput) elements.coachTopicInput.value = appState.coachTopic;
+  if (elements.coachLevelInput) elements.coachLevelInput.value = appState.coachLevel;
 }
 
-// ---------- Event Binding ----------
-
 function bindEvents() {
-  // Voice settings
-  elements.voiceToggle.addEventListener("change", (event) => {
-    appState.voiceEnabled = event.target.checked;
-  });
-
+  elements.voiceToggle.addEventListener("change", (event) => { appState.voiceEnabled = event.target.checked; });
   elements.voiceLanguageSelect.addEventListener("change", () => {
     window.localStorage.setItem("orbit_voice_language", elements.voiceLanguageSelect.value);
     setVoiceStatus(`Voice language: ${getSelectedLanguageLabel(elements.voiceLanguageSelect.value)}`);
-    if (appState.speechRecognition) {
-      appState.speechRecognition.lang = resolveRecognitionLanguage();
-    }
+    if (appState.speechRecognition) appState.speechRecognition.lang = resolveRecognitionLanguage();
   });
-
   elements.conversationLanguageSelect.addEventListener("change", () => {
     appState.preferredLanguage = elements.conversationLanguageSelect.value;
     window.localStorage.setItem("orbit_virtual_language", appState.preferredLanguage);
   });
-
-  // Mode switch
   elements.modeButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      setMode(button.dataset.mode || "simple");
-    });
+    button.addEventListener("click", () => { setMode(button.dataset.mode || "simple"); });
   });
-
-  // Coach inputs
   elements.coachTopicInput.addEventListener("input", () => {
     appState.coachTopic = elements.coachTopicInput.value.trim();
     window.localStorage.setItem("orbit_coach_topic", appState.coachTopic);
   });
-
   elements.coachLevelInput.addEventListener("input", () => {
     appState.coachLevel = elements.coachLevelInput.value.trim() || "Beginner";
     window.localStorage.setItem("orbit_coach_level", appState.coachLevel);
   });
 
-  // Sidebar toggle
   elements.sidebarCollapseBtn.addEventListener("click", toggleSidebar);
   elements.sidebarOpenBtn.addEventListener("click", toggleSidebar);
-
-  // Utility drawer toggle
   elements.utilityToggleBtn.addEventListener("click", toggleDrawer);
   elements.utilityCloseBtn.addEventListener("click", toggleDrawer);
-
-  // New chat
   elements.newChatBtn.addEventListener("click", startNewChat);
 
-  // Session actions
-  elements.pinChatBtn.addEventListener("click", async () => {
-    if (!appState.activeSessionId) {
-      addMessage("system", "Start a conversation first.");
-      return;
-    }
-    const session = appState.sessions.find((s) => s.session_id === appState.activeSessionId);
-    const newPinned = !(session && session.pinned);
-    try {
-      const res = await fetch(`/api/sessions/${appState.activeSessionId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pinned: newPinned }),
-      });
-      if (res.ok) {
-        addMessage("system", newPinned ? "Chat pinned." : "Chat unpinned.");
-        await refreshSessions();
-        updateSessionActionButtons();
-      }
-    } catch (err) {
-      addMessage("system", `Failed to update pin: ${err.message}`);
-    }
-  });
-  elements.archiveChatBtn.addEventListener("click", async () => {
-    if (!appState.activeSessionId) {
-      addMessage("system", "Start a conversation first.");
-      return;
-    }
-    const session = appState.sessions.find((s) => s.session_id === appState.activeSessionId);
-    const isArchived = session && session.archived;
-    try {
-      const res = await fetch(`/api/sessions/${appState.activeSessionId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ archived: !isArchived }),
-      });
-      if (res.ok) {
-        if (!isArchived) {
-          startNewChat();
-          addMessage("system", "Chat archived.");
-        } else {
-          addMessage("system", "Chat unarchived.");
-        }
-        await refreshSessions();
-        updateSessionActionButtons();
-      }
-    } catch (err) {
-      addMessage("system", `Failed to ${isArchived ? "unarchive" : "archive"}: ${err.message}`);
-    }
-  });
-  elements.deleteChatBtn.addEventListener("click", async () => {
-    if (!appState.activeSessionId) {
-      if (appState.conversation.length > 0) {
-        startNewChat();
-        addMessage("system", "Conversation cleared.");
-      }
-      return;
-    }
-    if (!confirm("Delete this chat permanently?")) return;
-    try {
-      const res = await fetch(`/api/sessions/${appState.activeSessionId}`, { method: "DELETE" });
-      if (res.ok) {
-        startNewChat();
-        addMessage("system", "Chat deleted.");
-        await refreshSessions();
-      }
-    } catch (err) {
-      addMessage("system", `Failed to delete: ${err.message}`);
-    }
-  });
+  if (elements.chatSettingsBtn && elements.chatSettingsDropdown) {
+    elements.chatSettingsBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isOpen = elements.chatSettingsDropdown.classList.contains("show");
+      closeAllDropdowns();
+      if (!isOpen) elements.chatSettingsDropdown.classList.add("show");
+    });
+  }
 
-  // Composer toggle chips
-  elements.attachFilesBtn.addEventListener("click", () => {
-    elements.fileAttachInput.click();
-  });
+  if (elements.renameChatBtn) {
+    elements.renameChatBtn.addEventListener("click", async () => {
+      closeAllDropdowns();
+      await openRenameChat(appState.activeSessionId);
+    });
+  }
 
+  if (elements.pinChatBtn) {
+    elements.pinChatBtn.addEventListener("click", async () => {
+      closeAllDropdowns();
+      await togglePinChat(appState.activeSessionId, { useActiveFallback: true });
+    });
+  }
+
+  if (elements.archiveChatBtn) {
+    elements.archiveChatBtn.addEventListener("click", async () => {
+      closeAllDropdowns();
+      await toggleArchiveChat(appState.activeSessionId, { useActiveFallback: true });
+    });
+  }
+
+  if (elements.deleteChatBtn) {
+    elements.deleteChatBtn.addEventListener("click", async () => {
+      closeAllDropdowns();
+      await deleteChat(appState.activeSessionId, { useActiveFallback: true });
+    });
+  }
+
+  elements.attachFilesBtn.addEventListener("click", () => elements.fileAttachInput.click());
   elements.fileAttachInput.addEventListener("change", handleFileAttach);
 
   setupToggleChip(elements.createImageBtn, "imageGenActive");
   setupToggleChip(elements.thinkingToggle, "thinkingActive");
-  setupToggleChip(elements.routingToggle, "routingActive");
+  if(elements.routingToggle) setupToggleChip(elements.routingToggle, "routingActive");
 
-  // Search and Offline toggles are mutually exclusive
   elements.webSearchToggle.addEventListener("click", () => {
     appState.webSearchActive = !appState.webSearchActive;
     elements.webSearchToggle.classList.toggle("active", appState.webSearchActive);
@@ -428,16 +324,12 @@ function bindEvents() {
     }
   });
 
-  // Push-to-Talk: mic button (Mode B)
   elements.micButton.addEventListener("pointerdown", handleMicPointerDown);
   window.addEventListener("pointerup", handleMicPointerUp);
   window.addEventListener("pointercancel", handleMicPointerUp);
-
-  // Keyboard voice shortcuts (Ctrl+M for Mode A, hold Control for Mode B)
   window.addEventListener("keydown", handleHotkeyDown);
   window.addEventListener("keyup", handleHotkeyUp);
 
-  // Form submission
   elements.composer.addEventListener("submit", async (event) => {
     event.preventDefault();
     const prompt = elements.messageInput.value.trim();
@@ -447,25 +339,17 @@ function bindEvents() {
     await sendPrompt(prompt);
   });
 
-  // Enter to send (Shift+Enter for newline)
   elements.messageInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      // Don't send during Mode A recording
-      if (appState.modeAActive && (appState.listening || appState.recognitionStarting)) {
-        return;
-      }
+      if (appState.modeAActive && (appState.listening || appState.recognitionStarting)) return;
       const prompt = elements.messageInput.value.trim();
-      if (prompt) {
-        elements.sendButton.click();
-      }
+      if (prompt) elements.sendButton.click();
     }
   });
 
-  // Textarea auto-resize
   elements.messageInput.addEventListener("input", autoResizeTextarea);
 
-  // Quick actions
   elements.quickActions.forEach((button) => {
     button.addEventListener("click", async () => {
       const needsScreen = button.dataset.needsScreen === "true";
@@ -473,19 +357,15 @@ function bindEvents() {
         addMessage("system", "Start screen sharing first so Orbit can use your current screen as context.");
         return;
       }
-
       let finalPrompt = button.dataset.prompt || "";
-
       if (finalPrompt.includes("RAG") || finalPrompt.includes("local papers")) {
         const topic = elements.coachTopicInput ? elements.coachTopicInput.value : appState.coachTopic;
         finalPrompt = `${finalPrompt} The topic is: ${topic}. YOU MUST call the search_local_docs tool first.`;
       }
-
       await sendPrompt(finalPrompt, { forceScreen: needsScreen });
     });
   });
 
-  // Practice buttons
   elements.practiceButtons.forEach((button) => {
     button.addEventListener("click", async () => {
       setMode("coach");
@@ -495,7 +375,6 @@ function bindEvents() {
     });
   });
 
-  // Existing panel event handlers
   elements.startShareButton.addEventListener("click", startScreenShare);
   elements.stopShareButton.addEventListener("click", stopScreenShare);
   elements.profileForm.addEventListener("submit", saveProfile);
@@ -504,53 +383,33 @@ function bindEvents() {
   elements.taskForm.addEventListener("submit", addTask);
   elements.noteForm.addEventListener("submit", addNoteManual);
 
-  // Window blur - stop any active voice
   window.addEventListener("blur", () => {
-    if (modeBDelayTimer) {
-      clearTimeout(modeBDelayTimer);
-      modeBDelayTimer = null;
-    }
+    if (modeBDelayTimer) { clearTimeout(modeBDelayTimer); modeBDelayTimer = null; }
     if (appState.hotkeyDown || appState.micHeld) {
       appState.hotkeyDown = false;
       appState.micHeld = false;
       appState.spaceTalking = false;
-      if (!appState.modeAActive) {
-        stopVoiceCapture();
-      }
+      if (!appState.modeAActive) stopVoiceCapture();
     }
   });
 
-  // Handle copy button clicks via event delegation
+  // Handle copy button clicks
   elements.messageList.addEventListener("click", async (event) => {
     const btn = event.target.closest(".copy-btn");
     if (!btn) return;
-    
-    // Find the adjacent code block
     const wrapper = btn.closest(".code-block-wrapper");
     const codeBlock = wrapper.querySelector("code");
-    
     if (codeBlock) {
       try {
         await navigator.clipboard.writeText(codeBlock.textContent);
-        
-        // Visual feedback
         const span = btn.querySelector("span");
         span.textContent = "Copied!";
         btn.classList.add("copied");
-        
-        setTimeout(() => {
-          span.textContent = "Copy";
-          btn.classList.remove("copied");
-        }, 2000);
-      } catch (err) {
-        console.error("Failed to copy code:", err);
-      }
+        setTimeout(() => { span.textContent = "Copy"; btn.classList.remove("copied"); }, 2000);
+      } catch (err) {}
     }
   });
-
 }
-
-// ---------- UI Panel Controls ----------
 
 function toggleSidebar() {
   elements.appLayout.classList.toggle("sidebar-collapsed");
@@ -558,12 +417,7 @@ function toggleSidebar() {
   window.localStorage.setItem("orbit_sidebar_open", appState.sidebarOpen ? "true" : "false");
 }
 
-function restoreSidebarState() {
-  if (!appState.sidebarOpen) {
-    elements.appLayout.classList.add("sidebar-collapsed");
-  }
-}
-
+function restoreSidebarState() { if (!appState.sidebarOpen) elements.appLayout.classList.add("sidebar-collapsed"); }
 function toggleDrawer() {
   elements.appLayout.classList.toggle("drawer-open");
   appState.drawerOpen = elements.appLayout.classList.contains("drawer-open");
@@ -575,7 +429,6 @@ function startNewChat() {
   elements.messageList.innerHTML = "";
   elements.toolEvents.innerHTML = "";
   elements.attachFilesBtn.classList.remove("active");
-  addMessage("system", "New conversation started.");
   renderSessions(appState.sessions);
   updateSessionActionButtons();
   elements.messageInput.focus();
@@ -594,14 +447,8 @@ function autoResizeTextarea() {
   textarea.style.height = Math.min(textarea.scrollHeight, 180) + "px";
 }
 
-// ---------- Avatar Worker ----------
-
 function initAvatarWorker() {
-  if (!window.Worker) {
-    elements.runtimeBadge.textContent = "No Web Worker";
-    return;
-  }
-
+  if (!window.Worker) { elements.runtimeBadge.textContent = "No Web Worker"; return; }
   const worker = new Worker("/avatar-worker.js");
   worker.addEventListener("message", (event) => {
     const payload = event.data || {};
@@ -617,48 +464,28 @@ function initAvatarWorker() {
 function setStageState(state, statusText, copyText = "") {
   elements.avatarStage.dataset.stageState = state;
   elements.stageStatus.textContent = statusText;
-  if (copyText) {
-    elements.stageCopy.textContent = copyText;
-  }
-  if (appState.stageWorker) {
-    appState.stageWorker.postMessage({ type: "set-state", state });
-  }
+  if (copyText) elements.stageCopy.textContent = copyText;
+  if (appState.stageWorker) appState.stageWorker.postMessage({ type: "set-state", state });
 }
 
-// ---------- Mode & UI State ----------
-
 function refreshTodayLabel() {
-  elements.todayLabel.textContent = new Date().toLocaleString(undefined, {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  elements.todayLabel.textContent = new Date().toLocaleString(undefined, { weekday: "long", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function updateModeUI() {
-  elements.modeButtons.forEach((button) =>
-    button.classList.toggle("active", button.dataset.mode === appState.mode)
-  );
+  elements.modeButtons.forEach((button) => button.classList.toggle("active", button.dataset.mode === appState.mode));
   elements.coachPanel.classList.toggle("hidden", appState.mode !== "coach");
-  if (appState.mode === "coach") {
-    elements.coachModeCopy.textContent =
-      "Orbit will act as a personal tutor. For best results, enable RAG mode to use your local documents as the textbook.";
-  }
+  if (appState.mode === "coach") elements.coachModeCopy.textContent = "Orbit will act as a personal tutor. For best results, enable RAG mode to use your local documents as the textbook.";
 }
 
 function setMode(mode, coachTopic = appState.coachTopic) {
   appState.mode = mode;
   appState.coachTopic = coachTopic;
-  if (elements.coachTopicInput) {
-    elements.coachTopicInput.value = appState.coachTopic || "";
-  }
+  if (elements.coachTopicInput) elements.coachTopicInput.value = appState.coachTopic || "";
   updateModeUI();
 }
 
 // ---------- Speech Recognition ----------
-
 function setupSpeechRecognition() {
   const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognitionClass) {
@@ -668,7 +495,6 @@ function setupSpeechRecognition() {
     setVoiceStatus("This browser does not expose speech recognition.");
     return;
   }
-
   const recognition = new SpeechRecognitionClass();
   recognition.lang = resolveRecognitionLanguage();
   recognition.interimResults = true;
@@ -679,40 +505,26 @@ function setupSpeechRecognition() {
     appState.recognitionStarting = false;
     appState.listening = true;
     updateMicButton();
-
-    // Mode A: don't create chat bubbles (transcript goes to textarea)
-    if (!appState.modeAActive) {
-      ensureVoiceTurn();
-      ensureVoiceDraft();
-    }
-
+    if (!appState.modeAActive) { ensureVoiceTurn(); ensureVoiceDraft(); }
     setStageState("listening", "Listening...", "Orbit is capturing speech.");
     setVoiceStatus(`Listening in ${getSelectedLanguageLabel(elements.voiceLanguageSelect.value)}...`);
-
-    if (appState.stopRecognitionAfterStart) {
-      recognition.stop();
-    }
+    if (appState.stopRecognitionAfterStart) recognition.stop();
   };
 
   recognition.onresult = (event) => {
     let transcript = "";
-    for (const result of event.results) {
-      transcript += `${result[0].transcript} `;
-    }
+    for (const result of event.results) transcript += `${result[0].transcript} `;
     appState.liveVoiceTranscript = transcript.trim();
 
     if (appState.modeAActive) {
-      // Mode A: put transcript in textarea for review
       elements.messageInput.value = appState.liveVoiceTranscript;
       autoResizeTextarea();
       setVoiceStatus("Transcribing...");
     } else {
-      // Mode B: put transcript in chat bubble
       ensureVoiceTurn();
       ensureVoiceDraft();
       appState.currentTurn.inputText = appState.liveVoiceTranscript;
-      appState.currentTurn.userNode.querySelector(".message-body").textContent =
-        appState.liveVoiceTranscript || "Listening...";
+      appState.currentTurn.userNode.querySelector(".message-body").textContent = appState.liveVoiceTranscript || "Listening...";
       appState.currentTurn.userNode.querySelector(".message-meta").textContent = "Voice transcript";
       setVoiceStatus("Capturing speech...");
     }
@@ -744,7 +556,6 @@ function setupSpeechRecognition() {
     appState.modeAActive = false;
     updateMicButton();
 
-    // --- Mode A: leave transcript in textarea for user review ---
     if (wasModea) {
       appState.liveVoiceTranscript = "";
       if (transcript) {
@@ -752,14 +563,11 @@ function setupSpeechRecognition() {
         elements.messageInput.focus();
         autoResizeTextarea();
         setVoiceStatus("Review and press Enter to send");
-      } else {
-        setVoiceStatus("Voice input idle");
-      }
+      } else { setVoiceStatus("Voice input idle"); }
       setStageState("idle", "Idle", "Voice transcription ready for review.");
       return;
     }
 
-    // --- Mode B: auto-send transcript ---
     if (transcript) {
       const voiceTurn = appState.currentTurn || createEmptyTurn("voice");
       voiceTurn.inputText = transcript;
@@ -772,7 +580,6 @@ function setupSpeechRecognition() {
       return;
     }
 
-    // No transcript - clean up
     if (appState.currentTurn?.userNode && !appState.currentTurn.inputText.trim()) {
       appState.currentTurn.userNode.remove();
       appState.currentTurn = null;
@@ -787,40 +594,18 @@ function setupSpeechRecognition() {
   setVoiceStatus(`Voice ready (${getSelectedLanguageLabel(elements.voiceLanguageSelect.value)})`);
 }
 
-// ---------- Voice Input Handlers ----------
-
 let modeBDelayTimer = null;
 
 function handleHotkeyDown(event) {
-  // --- Ctrl+M: Toggle Mode A (record-then-review) ---
   if (event.key.toLowerCase() === "m" && event.ctrlKey && !event.repeat) {
-    // Cancel any pending Mode B timer
-    if (modeBDelayTimer) {
-      clearTimeout(modeBDelayTimer);
-      modeBDelayTimer = null;
-    }
-
-    // Allow Ctrl+M in messageInput textarea but block in other form fields
+    if (modeBDelayTimer) { clearTimeout(modeBDelayTimer); modeBDelayTimer = null; }
     const active = document.activeElement;
-    if (active && active !== elements.messageInput &&
-        ["INPUT", "SELECT"].includes(active.tagName)) {
-      return;
-    }
-
+    if (active && active !== elements.messageInput && ["INPUT", "SELECT"].includes(active.tagName)) return;
     event.preventDefault();
-
-    if (appState.modeAActive) {
-      // Stop Mode A recording - onend will keep transcript in textarea
-      stopVoiceCapture();
-    } else if (!appState.listening && !appState.recognitionStarting) {
-      // Start Mode A recording
-      appState.modeAActive = true;
-      void startVoiceCapture();
-    }
+    if (appState.modeAActive) stopVoiceCapture();
+    else if (!appState.listening && !appState.recognitionStarting) { appState.modeAActive = true; void startVoiceCapture(); }
     return;
   }
-
-  // --- ESC: Cancel Mode A recording ---
   if (event.key === "Escape") {
     if (appState.modeAActive && (appState.listening || appState.recognitionStarting)) {
       event.preventDefault();
@@ -834,14 +619,11 @@ function handleHotkeyDown(event) {
     }
     return;
   }
-
-  // --- Hold Control: Mode B (instant-send) with delay to avoid Ctrl+M conflict ---
   if (event.key === "Control" && !event.repeat && !shouldIgnoreHotkey()) {
     appState.hotkeyDown = true;
     modeBDelayTimer = window.setTimeout(() => {
       modeBDelayTimer = null;
-      if (appState.hotkeyDown && !appState.modeAActive &&
-          !appState.listening && !appState.recognitionStarting) {
+      if (appState.hotkeyDown && !appState.modeAActive && !appState.listening && !appState.recognitionStarting) {
         appState.spaceTalking = true;
         void startVoiceCapture();
       }
@@ -852,26 +634,17 @@ function handleHotkeyDown(event) {
 
 function handleHotkeyUp(event) {
   if (event.key === "Control") {
-    // Cancel Mode B delay timer if still pending
-    if (modeBDelayTimer) {
-      clearTimeout(modeBDelayTimer);
-      modeBDelayTimer = null;
-    }
-
+    if (modeBDelayTimer) { clearTimeout(modeBDelayTimer); modeBDelayTimer = null; }
     if (appState.hotkeyDown) {
       appState.hotkeyDown = false;
-      if (!appState.modeAActive) {
-        appState.spaceTalking = false;
-        stopVoiceCapture();
-      }
+      if (!appState.modeAActive) { appState.spaceTalking = false; stopVoiceCapture(); }
     }
   }
 }
 
-// Mic button click-and-hold (Mode B behavior)
 function handleMicPointerDown(event) {
   if (event.button !== 0) return;
-  if (appState.modeAActive) return; // Don't interfere with Mode A
+  if (appState.modeAActive) return;
   appState.micHeld = true;
   void startVoiceCapture();
 }
@@ -891,7 +664,6 @@ function shouldIgnoreHotkey() {
 async function startVoiceCapture() {
   if (!appState.speechSupported || !appState.speechRecognition) return;
   if (appState.listening || appState.recognitionStarting) return;
-
   try {
     appState.recognitionStarting = true;
     appState.stopRecognitionAfterStart = false;
@@ -908,29 +680,16 @@ async function startVoiceCapture() {
 
 function stopVoiceCapture() {
   if (!appState.speechRecognition) return;
-
-  if (appState.recognitionStarting && !appState.listening) {
-    appState.stopRecognitionAfterStart = true;
-    return;
-  }
-  if (appState.listening) {
-    appState.speechRecognition.stop();
-  }
+  if (appState.recognitionStarting && !appState.listening) { appState.stopRecognitionAfterStart = true; return; }
+  if (appState.listening) appState.speechRecognition.stop();
 }
 
 function resolveRecognitionLanguage() {
-  return elements.voiceLanguageSelect.value === "default"
-    ? navigator.language || "en-US"
-    : elements.voiceLanguageSelect.value;
+  return elements.voiceLanguageSelect.value === "default" ? navigator.language || "en-US" : elements.voiceLanguageSelect.value;
 }
 
 function updateMicButton() {
-  if (!appState.speechSupported) {
-    elements.micButton.disabled = true;
-    elements.micButton.title = "Voice unavailable";
-    return;
-  }
-
+  if (!appState.speechSupported) { elements.micButton.disabled = true; elements.micButton.title = "Voice unavailable"; return; }
   elements.micButton.disabled = false;
   if (appState.listening || appState.recognitionStarting) {
     elements.micButton.title = appState.modeAActive ? "Recording (Ctrl+M to stop)" : "Release to send";
@@ -941,61 +700,89 @@ function updateMicButton() {
   }
 }
 
-function ensureVoiceTurn() {
-  if (!appState.currentTurn || appState.currentTurn.source !== "voice") {
-    appState.currentTurn = createEmptyTurn("voice");
-  }
-}
-
-function ensureVoiceDraft() {
-  if (!appState.currentTurn.userNode) {
-    appState.currentTurn.userNode = addMessage("user", "Listening...", "Voice transcript");
-  }
-}
-
-function setVoiceStatus(text) {
-  elements.voiceStatus.textContent = text;
-  elements.composerVoiceStatus.textContent = text;
-}
+function ensureVoiceTurn() { if (!appState.currentTurn || appState.currentTurn.source !== "voice") appState.currentTurn = createEmptyTurn("voice"); }
+function ensureVoiceDraft() { if (!appState.currentTurn.userNode) appState.currentTurn.userNode = addMessage("user", "Listening...", "Voice transcript"); }
+function setVoiceStatus(text) { elements.voiceStatus.textContent = text; elements.composerVoiceStatus.textContent = text; }
 
 // ---------- API Communication ----------
 
 async function refreshState() {
   const response = await fetch("/api/state");
   const data = await response.json();
-
   appState.memory = data.memory;
 
-  // Hide or show the Smart Routing button based on CLI configuration
   if (elements.routingToggle) {
     if (data.enableHybrid) {
       elements.routingToggle.style.display = "inline-flex";
     } else {
       elements.routingToggle.style.display = "none";
-      appState.routingActive = false; // Make sure to always turn it off if the CLI doesn't allow it.
+      appState.routingActive = false;
     }
   }
 
-  if (data.history && data.history.length > 0) {
-    appState.conversation = data.history;
-  }
-
+  if (data.history && data.history.length > 0) appState.conversation = data.history;
   appState.liveVoiceName = data.liveVoiceName || "Kore";
   const provider = data.provider || "Gemini";
   elements.apiStatus.textContent = data.hasApiKey ? `${provider} key detected` : "Add API_KEY to enable chat";
   elements.modelBadge.textContent = data.model ? `${data.model}` : "Model not set";
-  elements.runtimeBadge.textContent = "Browser + REST";
+  elements.runtimeBadge.textContent = "Browser Engine";
 
   elements.displayNameInput.value = data.memory.profile.display_name || "";
   elements.locationInput.value = data.memory.profile.location || data.defaultLocation || "";
   elements.routineInput.value = data.memory.profile.routine || "";
 
   refreshMemoryViews();
-
   appState.sessions = data.sessions || [];
   renderSessions(appState.sessions);
 }
 
+// ==========================================
+// THE UI-SIDE "STREAMING" EFFECT FUNCTION
+// ==========================================
+async function streamMarkdown(container, text, speed = 15) {
+  const html = typeof marked !== "undefined" ? marked.parse(text) : text;
+  container.innerHTML = "";
+  
+  const tokens = html.split(/(<[^>]+>)/g);
+  let currentHTML = "";
+
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token.startsWith("<")) {
+      currentHTML += token;
+      container.innerHTML = currentHTML;
+    } else {
+      const words = token.split(/(\s+)/);
+      for (let j = 0; j < words.length; j++) {
+        currentHTML += words[j];
+        container.innerHTML = currentHTML + '<span class="streaming-cursor"></span>';
+        elements.messageList.scrollTop = elements.messageList.scrollHeight;
+        await new Promise((r) => setTimeout(r, speed));
+      }
+    }
+  }
+  
+  container.innerHTML = currentHTML;
+  formatLinks(container);
+
+  // --- Render Math/LaTeX AFTER streaming finishes ---
+  if (typeof renderMathInElement === "function") {
+    renderMathInElement(container, {
+      delimiters: [
+        {left: "$$", right: "$$", display: true},
+        {left: "\\[", right: "\\]", display: true},
+        {left: "$", right: "$", display: false},
+        {left: "\\(", right: "\\)", display: false}
+      ],
+      throwOnError: false,
+      output: "html"
+    });
+  }
+}
+
+// ==========================================
+// SEND PROMPT LOGIC (Synchronous JSON Wait + Fake Stream)
+// ==========================================
 async function sendPrompt(prompt, options = {}) {
   if (appState.currentTurn && appState.currentTurn.assistantNode) return;
   if (appState.isProcessing) return;
@@ -1012,8 +799,7 @@ async function sendPrompt(prompt, options = {}) {
     turn.userNode = addMessage("user", prompt, attachScreen && screenImage ? "Screen attached" : "");
   } else {
     turn.userNode.querySelector(".message-body").textContent = prompt;
-    turn.userNode.querySelector(".message-meta").textContent =
-      attachScreen && screenImage ? "Screen attached" : "Voice input";
+    turn.userNode.querySelector(".message-meta").textContent = attachScreen && screenImage ? "Screen attached" : "Voice input";
   }
 
   if (!turn.userStored) {
@@ -1021,45 +807,33 @@ async function sendPrompt(prompt, options = {}) {
     turn.userStored = true;
   }
 
-  const placeholderText = getThinkingStatus().text;
-  turn.assistantNode = turn.assistantNode || addMessage("assistant", placeholderText);
-  turn.assistantNode.querySelector(".message-body").textContent = placeholderText;
   appState.currentTurn = turn;
-
   setComposerState(true);
   appState.isProcessing = true;
+
   const thinkingStatus = getThinkingStatus();
   setStageState("thinking", thinkingStatus.text, thinkingStatus.copy);
 
-  // Auto-create session on first message
   try {
     if (!appState.activeSessionId) {
       const sessionRes = await fetch("/api/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          firstMessage: prompt 
-        }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ firstMessage: prompt }),
       });
       const sessionData = await sessionRes.json();
       if (sessionRes.ok && sessionData.session) {
         appState.activeSessionId = sessionData.session.session_id;
-        await refreshSessions(); 
+        await refreshSessions();
       }
     }
-  } catch (err) {
-    console.error("Session creation error:", err);
-  }
+  } catch (err) {}
 
   const targetSessionId = appState.activeSessionId;
-
-  // Store user message in session
   if (targetSessionId) {
     fetch(`/api/sessions/${targetSessionId}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role: "user", text: prompt }),
-    }).catch((err) => console.error("User message store error:", err));
+    }).catch(err => {});
   }
 
   try {
@@ -1084,77 +858,59 @@ async function sendPrompt(prompt, options = {}) {
     });
 
     const data = await response.json();
+    if (!response.ok) throw new Error(data.error || data.detail || "Chat request failed.");
 
-    if (!response.ok) {
-      throw new Error(data.error || "Chat request failed.");
-    }
-
-    // Discard UI update if user switched sessions during the request
-    if (targetSessionId && targetSessionId !== appState.activeSessionId) {
-      // Message is already stored in DB; just skip UI rendering
-      return;
-    }
-
+    appState.memory = data.memory;
     turn.outputText = data.reply;
 
-    // if (typeof marked !== "undefined") {
-    //   turn.assistantNode.querySelector(".message-body").innerHTML = marked.parse(data.reply);
-    //   formatLinks(turn.assistantNode.querySelector(".message-body"));
-    // } else {
-    //   turn.assistantNode.querySelector(".message-body").textContent = data.reply;
-    // }
+    if (data.toolEvents && data.toolEvents.length > 0) {
+      appState.recentToolEvents.push(...data.toolEvents);
+      renderToolEvents(appState.recentToolEvents);
+    }
 
-    turn.outputText = data.reply;
+    if (!turn.assistantNode) {
+      turn.assistantNode = addMessage("assistant", "");
+    }
+    
+    const isRefusal = data.reply.includes("safety and moderation guidelines");
+    const isEmpty = data.reply.trim().length === 0;
     const bodyElement = turn.assistantNode.querySelector(".message-body");
 
-    await streamMarkdown(bodyElement, data.reply);
-
-    const isRefusal = data.reply.includes("safety and moderation guidelines");
-    if (isRefusal) {
+    if (isRefusal || isEmpty) {
       appState.conversation.pop();
+      if (isEmpty) {
+        bodyElement.textContent = "Error: The model returned an empty response. Please try asking again.";
+        turn.assistantNode.classList.add("system");
+      } else {
+        bodyElement.textContent = data.reply;
+      }
     } else {
-      appState.conversation.push({ role: "assistant", text: data.reply });
+      await streamMarkdown(bodyElement, data.reply);
 
-      // Store assistant message in session
+      appState.conversation.push({ role: "assistant", text: data.reply });
       if (targetSessionId) {
         fetch(`/api/sessions/${targetSessionId}/messages`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ role: "assistant", text: data.reply }),
-        }).catch((err) => console.error("Assistant message store error:", err));
+        }).catch(err => {});
       }
-
       refreshSessions();
     }
 
-    appState.memory = data.memory;
-    appState.recentToolEvents = data.toolEvents || [];
     refreshMemoryViews();
-    renderToolEvents(appState.recentToolEvents);
-    setStageState("speaking", "Replying", "Model reply is visible in chat.");
+    setStageState("idle", "Idle");
 
-    if (shouldSpeakReply && "speechSynthesis" in window) {
+    if (shouldSpeakReply && "speechSynthesis" in window && !isRefusal && !isEmpty) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(data.reply);
       const voices = window.speechSynthesis.getVoices();
-      const selectedVoice = voices.find((v) =>
-        v.name.toLowerCase().includes(appState.liveVoiceName.toLowerCase())
-      );
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-        utterance.lang = selectedVoice.lang;
-      }
-      utterance.onend = () => setStageState("idle", "Idle");
+      const selectedVoice = voices.find((v) => v.name.toLowerCase().includes(appState.liveVoiceName.toLowerCase()));
+      if (selectedVoice) { utterance.voice = selectedVoice; utterance.lang = selectedVoice.lang; }
       window.speechSynthesis.speak(utterance);
-    } else {
-      window.setTimeout(() => setStageState("idle", "Idle"), 320);
     }
   } catch (error) {
-    const errorMessage = error.message.includes("image input")
-      ? "I'm sorry, the current AI model doesn't support image analysis. Please try text-only or switch models."
-      : `Error: ${error.message}`;
-
-    turn.assistantNode.querySelector(".message-body").textContent = errorMessage;
+    if (!turn.assistantNode) turn.assistantNode = addMessage("assistant", "");
+    turn.assistantNode.querySelector(".message-body").textContent = `Error: ${error.message}`;
     turn.assistantNode.classList.add("system");
     appState.conversation.pop();
     setStageState("idle", "Error occurred.");
@@ -1175,9 +931,20 @@ function addMessage(role, text, meta = "", timestamp = null) {
   const body = document.createElement("div");
   body.className = "message-body";
 
-  if (role === "assistant" && typeof marked !== "undefined") {
+  if (role === "assistant" && typeof marked !== "undefined" && text !== "") {
     body.innerHTML = marked.parse(text);
     formatLinks(body);
+    if (typeof renderMathInElement === "function") {
+        renderMathInElement(body, {
+          delimiters: [
+            {left: "$$", right: "$$", display: true},
+            {left: "\\[", right: "\\]", display: true},
+            {left: "$", right: "$", display: false},
+            {left: "\\(", right: "\\)", display: false}
+          ],
+          throwOnError: false, output: "html"
+        });
+    }
   } else {
     body.textContent = text;
   }
@@ -1198,7 +965,6 @@ function addMessage(role, text, meta = "", timestamp = null) {
 
   message.append(body, footer);
 
-  // Add "Add to Notes" button for assistant and user messages (not system)
   if (role === "assistant" || role === "user") {
     const actions = document.createElement("div");
     actions.className = "message-actions";
@@ -1235,43 +1001,206 @@ function renderSessions(sessions) {
   const recent = sessions.filter((s) => !s.pinned && !s.archived);
   const archived = sessions.filter((s) => s.archived);
 
-  // Pinned group
-  if (pinned.length > 0) {
-    elements.pinnedChatsGroup.style.display = "";
-  } else {
-    elements.pinnedChatsGroup.style.display = "none";
-  }
-
+  if (pinned.length > 0) elements.pinnedChatsGroup.style.display = "";
+  else elements.pinnedChatsGroup.style.display = "none";
   elements.pinnedChats.innerHTML = "";
-  pinned.forEach((s) => {
-    elements.pinnedChats.appendChild(createSessionItem(s));
-  });
+  pinned.forEach((s) => elements.pinnedChats.appendChild(createSessionItem(s)));
 
-  // Recent group
   elements.recentChats.innerHTML = "";
-  recent.slice(0, 30).forEach((s) => {
-    elements.recentChats.appendChild(createSessionItem(s));
-  });
+  recent.slice(0, 30).forEach((s) => elements.recentChats.appendChild(createSessionItem(s)));
 
-  // Archived group
-  if (archived.length > 0) {
-    elements.archivedChatsGroup.style.display = "";
-  } else {
-    elements.archivedChatsGroup.style.display = "none";
+  if (archived.length > 0) elements.archivedChatsGroup.style.display = "";
+  else elements.archivedChatsGroup.style.display = "none";
+  elements.archivedChats.innerHTML = "";
+  archived.slice(0, 20).forEach((s) => elements.archivedChats.appendChild(createSessionItem(s)));
+}
+
+function getSessionById(sessionId) {
+  if (!sessionId) return null;
+  return appState.sessions.find((session) => session.session_id === sessionId) || null;
+}
+
+function getActiveSession() {
+  return getSessionById(appState.activeSessionId);
+}
+
+function getSessionMenuMarkup(action, session = null) {
+  if (action === "rename") return `${SESSION_MENU_ICONS.rename} Rename`;
+  if (action === "pin") {
+    return session && session.pinned
+      ? `${SESSION_MENU_ICONS.unpin} Unpin chat`
+      : `${SESSION_MENU_ICONS.pin} Pin chat`;
+  }
+  if (action === "archive") {
+    return session && session.archived
+      ? `${SESSION_MENU_ICONS.unarchive} Unarchive`
+      : `${SESSION_MENU_ICONS.archive} Archive`;
+  }
+  if (action === "delete") return `${SESSION_MENU_ICONS.delete} Delete`;
+  return "";
+}
+
+function setSessionMenuItemMarkup(element, action, session = null) {
+  if (element) element.innerHTML = getSessionMenuMarkup(action, session);
+}
+
+async function getResponseErrorMessage(response, fallback = "Request failed.") {
+  try {
+    const data = await response.json();
+    return data.detail || data.message || fallback;
+  } catch (err) {
+    return response.statusText || fallback;
+  }
+}
+
+async function openRenameChat(sessionId) {
+  const session = getSessionById(sessionId);
+  if (!session) return;
+
+  const currentTitle = session.title || "";
+  const newTitle = prompt("Enter new title for this chat:", currentTitle);
+  const trimmedTitle = newTitle ? newTitle.trim() : "";
+
+  if (!trimmedTitle || trimmedTitle === currentTitle) return;
+
+  try {
+    const response = await fetch(`/api/sessions/${session.session_id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: trimmedTitle }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await getResponseErrorMessage(response, "Unable to rename chat."));
+    }
+
+    await refreshSessions();
+  } catch (err) {
+    addMessage("system", `Failed to rename: ${err.message}`);
+  }
+}
+
+async function togglePinChat(sessionId, { useActiveFallback = false } = {}) {
+  const resolvedSessionId = sessionId || (useActiveFallback ? appState.activeSessionId : null);
+  const session = getSessionById(resolvedSessionId);
+
+  if (!session) {
+    if (useActiveFallback) addMessage("system", "Start a conversation first.");
+    return;
   }
 
-  elements.archivedChats.innerHTML = "";
-  archived.slice(0, 20).forEach((s) => {
-    elements.archivedChats.appendChild(createSessionItem(s));
-  });
+  const newPinned = !session.pinned;
+
+  try {
+    const response = await fetch(`/api/sessions/${session.session_id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned: newPinned }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await getResponseErrorMessage(response, "Unable to update pin state."));
+    }
+
+    addMessage("system", newPinned ? "Chat pinned." : "Chat unpinned.");
+    await refreshSessions();
+  } catch (err) {
+    addMessage("system", `Failed to update pin: ${err.message}`);
+  }
 }
+
+async function toggleArchiveChat(sessionId, { useActiveFallback = false } = {}) {
+  const resolvedSessionId = sessionId || (useActiveFallback ? appState.activeSessionId : null);
+  const session = getSessionById(resolvedSessionId);
+
+  if (!session) {
+    if (useActiveFallback) addMessage("system", "Start a conversation first.");
+    return;
+  }
+
+  const isArchived = !!session.archived;
+
+  try {
+    const response = await fetch(`/api/sessions/${session.session_id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived: !isArchived }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await getResponseErrorMessage(response, `Unable to ${isArchived ? "unarchive" : "archive"} chat.`));
+    }
+
+    if (!isArchived && session.session_id === appState.activeSessionId) {
+      startNewChat();
+    }
+
+    addMessage("system", isArchived ? "Chat unarchived." : "Chat archived.");
+    await refreshSessions();
+  } catch (err) {
+    addMessage("system", `Failed to ${isArchived ? "unarchive" : "archive"}: ${err.message}`);
+  }
+}
+
+async function deleteChat(sessionId, { useActiveFallback = false } = {}) {
+  const resolvedSessionId = sessionId || (useActiveFallback ? appState.activeSessionId : null);
+  const session = getSessionById(resolvedSessionId);
+
+  if (!session) {
+    if (useActiveFallback && appState.conversation.length > 0) {
+      startNewChat();
+      addMessage("system", "Conversation cleared.");
+    }
+    return;
+  }
+
+  if (!confirm("Delete this chat permanently?")) return;
+
+  try {
+    const response = await fetch(`/api/sessions/${session.session_id}`, { method: "DELETE" });
+
+    if (!response.ok) {
+      throw new Error(await getResponseErrorMessage(response, "Unable to delete chat."));
+    }
+
+    if (session.session_id === appState.activeSessionId) startNewChat();
+    addMessage("system", "Chat deleted.");
+    await refreshSessions();
+  } catch (err) {
+    addMessage("system", `Failed to delete: ${err.message}`);
+  }
+}
+
+// function createSessionItem(session) {
+//   const item = document.createElement("div");
+//   item.className = "session-item";
+//   if (session.session_id === appState.activeSessionId) item.classList.add("active");
+
+//   const icon = document.createElement("span");
+//   icon.className = "session-icon";
+//   icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>';
+
+//   const title = document.createElement("span");
+//   title.className = "session-title";
+//   title.textContent = session.title || "Untitled chat";
+
+//   item.append(icon, title);
+
+//   if (session.pinned) {
+//     const pin = document.createElement("span");
+//     pin.className = "session-pin-indicator";
+//     pin.textContent = "\u{1F4CC}";
+//     item.appendChild(pin);
+//   }
+
+//   item.addEventListener("click", () => loadSession(session.session_id));
+//   return item;
+// }
 
 function createSessionItem(session) {
   const item = document.createElement("div");
   item.className = "session-item";
-  if (session.session_id === appState.activeSessionId) {
-    item.classList.add("active");
-  }
+  if (session.session_id === appState.activeSessionId) item.classList.add("active");
 
   const icon = document.createElement("span");
   icon.className = "session-icon";
@@ -1289,6 +1218,73 @@ function createSessionItem(session) {
     pin.textContent = "\u{1F4CC}";
     item.appendChild(pin);
   }
+
+  // --- Three Dots Menu ---
+  const optionsBtn = document.createElement("button");
+  optionsBtn.className = "session-actions-btn";
+  optionsBtn.title = "Options";
+  optionsBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
+  
+  const dropdown = document.createElement("div");
+  dropdown.className = "dropdown-menu session-dropdown";
+  
+  const renameOpt = document.createElement("button");
+  renameOpt.className = "dropdown-item";
+  renameOpt.innerHTML = getSessionMenuMarkup("rename");
+  renameOpt.onclick = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeAllDropdowns();
+    await openRenameChat(session.session_id);
+  };
+
+  const pinOpt = document.createElement("button");
+  pinOpt.className = "dropdown-item";
+  pinOpt.innerHTML = getSessionMenuMarkup("pin", session);
+  pinOpt.onclick = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeAllDropdowns();
+    await togglePinChat(session.session_id);
+  };
+
+  const archiveOpt = document.createElement("button");
+  archiveOpt.className = "dropdown-item";
+  archiveOpt.innerHTML = getSessionMenuMarkup("archive", session);
+  archiveOpt.onclick = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeAllDropdowns();
+    await toggleArchiveChat(session.session_id);
+  };
+
+  const divider = document.createElement("div");
+  divider.className = "dropdown-divider";
+
+  const deleteOpt = document.createElement("button");
+  deleteOpt.className = "dropdown-item danger";
+  deleteOpt.innerHTML = getSessionMenuMarkup("delete");
+  deleteOpt.onclick = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeAllDropdowns();
+    await deleteChat(session.session_id);
+  };
+
+  dropdown.append(renameOpt, pinOpt, archiveOpt, divider, deleteOpt);
+  
+  optionsBtn.onclick = (e) => {
+    e.preventDefault(); 
+    e.stopPropagation(); 
+    const isOpen = dropdown.classList.contains("show");
+    closeAllDropdowns();
+    if (!isOpen) { 
+      dropdown.classList.add("show"); 
+      optionsBtn.classList.add("menu-open"); 
+    }
+  };
+
+  item.append(optionsBtn, dropdown);
 
   item.addEventListener("click", () => loadSession(session.session_id));
   return item;
@@ -1312,9 +1308,7 @@ async function loadSession(sessionId) {
       addMessage(msg.role, msg.text, "", msg.created_at);
       appState.conversation.push({ role: msg.role, text: msg.text });
     });
-  } catch (err) {
-    addMessage("system", `Failed to load session: ${err.message}`);
-  }
+  } catch (err) {}
 
   renderSessions(appState.sessions);
   updateSessionActionButtons();
@@ -1326,27 +1320,16 @@ async function refreshSessions() {
     const data = await response.json();
     appState.sessions = data.sessions || [];
     renderSessions(appState.sessions);
-  } catch (err) {
-    console.error("Failed to refresh sessions:", err);
-  }
+    updateSessionActionButtons();
+  } catch (err) {}
 }
 
 function updateSessionActionButtons() {
-  const session = appState.sessions.find((s) => s.session_id === appState.activeSessionId);
-  if (session && session.pinned) {
-    elements.pinChatBtn.classList.add("active");
-    elements.pinChatBtn.title = "Unpin this chat";
-  } else {
-    elements.pinChatBtn.classList.remove("active");
-    elements.pinChatBtn.title = "Pin this chat";
-  }
-  if (session && session.archived) {
-    elements.archiveChatBtn.classList.add("active");
-    elements.archiveChatBtn.title = "Unarchive this chat";
-  } else {
-    elements.archiveChatBtn.classList.remove("active");
-    elements.archiveChatBtn.title = "Archive this chat";
-  }
+  const session = getActiveSession();
+  setSessionMenuItemMarkup(elements.renameChatBtn, "rename");
+  setSessionMenuItemMarkup(elements.pinChatBtn, "pin", session);
+  setSessionMenuItemMarkup(elements.archiveChatBtn, "archive", session);
+  setSessionMenuItemMarkup(elements.deleteChatBtn, "delete");
 }
 
 // ---------- Memory & Data Views ----------
@@ -1372,13 +1355,8 @@ function renderWeather(weather) {
     elements.weatherCard.innerHTML = '<p class="muted">No weather loaded yet.</p>';
     return;
   }
-
   elements.weatherCard.innerHTML = `
-    <div class="weather-item">
-      <p class="task-title">${escapeHtml(weather.location)}</p>
-      <p>${escapeHtml(weather.condition)}</p>
-      <p class="tiny">${escapeHtml(weather.advice || "")}</p>
-    </div>
+    <div class="weather-item"><p class="task-title">${escapeHtml(weather.location)}</p><p>${escapeHtml(weather.condition)}</p><p class="tiny">${escapeHtml(weather.advice || "")}</p></div>
     <div class="weather-grid">
       <div class="weather-item"><strong>${formatValue(weather.temperature_c)}&deg;C</strong><div class="tiny">Temperature</div></div>
       <div class="weather-item"><strong>${formatValue(weather.feels_like_c)}&deg;C</strong><div class="tiny">Feels like</div></div>
@@ -1393,18 +1371,13 @@ function renderNews(news) {
     elements.newsCard.innerHTML = '<p class="muted">No news loaded yet.</p>';
     return;
   }
-
-  elements.newsCard.innerHTML = news.items
-    .map(
-      (item) => `
+  elements.newsCard.innerHTML = news.items.map((item) => `
         <article class="news-item">
           <p class="task-title">${escapeHtml(item.title)}</p>
           <div class="tiny">${escapeHtml(item.source || "Google News")}${item.published_at ? ` - ${escapeHtml(item.published_at)}` : ""}</div>
           <a href="${escapeHtml(item.link)}" target="_blank" rel="noreferrer">Open headline</a>
         </article>
-      `
-    )
-    .join("");
+      `).join("");
 }
 
 function renderTasks(tasks) {
@@ -1413,16 +1386,12 @@ function renderTasks(tasks) {
     elements.taskList.innerHTML = '<p class="muted">No open tasks yet.</p>';
     return;
   }
-
   elements.taskList.innerHTML = "";
   openTasks.forEach((task) => {
     const item = document.createElement("div");
     item.className = "task-item";
     item.innerHTML = `
-      <div>
-        <p class="task-title">${escapeHtml(task.title)}</p>
-        <div class="tiny">#${escapeHtml(task.id)} - ${escapeHtml(task.priority)} priority${task.due_date ? ` - due ${escapeHtml(task.due_date)}` : ""}</div>
-      </div>
+      <div><p class="task-title">${escapeHtml(task.title)}</p><div class="tiny">#${escapeHtml(task.id)} - ${escapeHtml(task.priority)} priority${task.due_date ? ` - due ${escapeHtml(task.due_date)}` : ""}</div></div>
       <button class="ghost-button">Done</button>
     `;
     item.querySelector("button").addEventListener("click", () => completeTask(task.id));
@@ -1433,21 +1402,15 @@ function renderTasks(tasks) {
 function renderNotes(notes) {
   const recentNotes = (notes || []).slice(-4).reverse();
   if (!recentNotes.length) {
-    elements.notesList.innerHTML =
-      '<p class="muted">Ask Orbit to remember preferences, routines, or useful details.</p>';
+    elements.notesList.innerHTML = '<p class="muted">Ask Orbit to remember preferences, routines, or useful details.</p>';
     return;
   }
-
   elements.notesList.innerHTML = "";
   recentNotes.forEach((note) => {
     const item = document.createElement("div");
     item.className = "note-item";
     item.innerHTML = `
-      <div class="note-content">
-        <p class="note-title">${escapeHtml(note.category)}</p>
-        <p>${escapeHtml(note.text)}</p>
-        <div class="tiny">${escapeHtml(note.created_at)}</div>
-      </div>
+      <div class="note-content"><p class="note-title">${escapeHtml(note.category)}</p><p>${escapeHtml(note.text)}</p><div class="tiny">${escapeHtml(note.created_at)}</div></div>
       <button class="note-delete-btn" title="Delete this note">&times;</button>
     `;
     item.querySelector(".note-delete-btn").addEventListener("click", () => deleteNote(note.id));
@@ -1459,10 +1422,8 @@ function renderNotes(notes) {
 
 async function saveProfile(event) {
   event.preventDefault();
-
   const response = await fetch("/api/profile", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       displayName: elements.displayNameInput.value.trim(),
       location: elements.locationInput.value.trim(),
@@ -1470,14 +1431,9 @@ async function saveProfile(event) {
     }),
   });
   const data = await response.json();
-  if (!response.ok) {
-    addMessage("system", data.error || "Could not save your profile.");
-    return;
-  }
-
+  if (!response.ok) { addMessage("system", data.error || "Could not save your profile."); return; }
   appState.memory = data.memory;
   refreshMemoryViews();
-  addMessage("system", "Profile saved for Orbit.");
 }
 
 async function refreshWeather() {
@@ -1485,14 +1441,9 @@ async function refreshWeather() {
   const query = location ? `?location=${encodeURIComponent(location)}` : "";
   const response = await fetch(`/api/weather${query}`);
   const data = await response.json();
-  if (!response.ok) {
-    addMessage("system", data.error || "Could not refresh the weather.");
-    return;
-  }
-
+  if (!response.ok) { addMessage("system", data.error || "Could not refresh the weather."); return; }
   appState.memory = data.memory;
   refreshMemoryViews();
-  addMessage("system", `Weather refreshed for ${data.weather.location}.`);
 }
 
 async function refreshNews() {
@@ -1501,22 +1452,15 @@ async function refreshNews() {
   const query = `?topic=${encodeURIComponent(topic)}`;
   const response = await fetch(`/api/news${query}`);
   const data = await response.json();
-  if (!response.ok) {
-    addMessage("system", data.error || "Could not refresh the news.");
-    return;
-  }
-
+  if (!response.ok) { addMessage("system", data.error || "Could not refresh the news."); return; }
   appState.memory = data.memory;
   refreshMemoryViews();
-  addMessage("system", `News refreshed for ${data.news.topic}.`);
 }
 
 async function addTask(event) {
   event.preventDefault();
-
   const response = await fetch("/api/tasks", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       title: elements.taskTitleInput.value.trim(),
       priority: elements.taskPriorityInput.value,
@@ -1524,11 +1468,7 @@ async function addTask(event) {
     }),
   });
   const data = await response.json();
-  if (!response.ok) {
-    addMessage("system", data.error || "Could not add the task.");
-    return;
-  }
-
+  if (!response.ok) return;
   elements.taskTitleInput.value = "";
   elements.taskDueDateInput.value = "";
   appState.memory = data.memory;
@@ -1537,16 +1477,11 @@ async function addTask(event) {
 
 async function completeTask(taskRef) {
   const response = await fetch("/api/tasks/complete", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ taskRef }),
   });
   const data = await response.json();
-  if (!response.ok) {
-    addMessage("system", data.error || "Could not complete the task.");
-    return;
-  }
-
+  if (!response.ok) return;
   appState.memory = data.memory;
   refreshMemoryViews();
 }
@@ -1555,16 +1490,11 @@ async function deleteNote(noteId) {
   if (!noteId) return;
   try {
     const response = await fetch(`/api/notes/${noteId}`, { method: "DELETE" });
+    if (!response.ok) return;
     const data = await response.json();
-    if (!response.ok) {
-      addMessage("system", data.error || "Could not delete the note.");
-      return;
-    }
     appState.memory = data.memory;
     refreshMemoryViews();
-  } catch (err) {
-    addMessage("system", `Failed to delete note: ${err.message}`);
-  }
+  } catch (err) {}
 }
 
 async function addNoteManual(event) {
@@ -1572,76 +1502,45 @@ async function addNoteManual(event) {
   const text = elements.noteTextInput.value.trim();
   const category = elements.noteCategoryInput.value.trim() || "note";
   if (!text) return;
-
   try {
     const response = await fetch("/api/notes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, category }),
     });
+    if (!response.ok) return;
     const data = await response.json();
-    if (!response.ok) {
-      addMessage("system", data.error || "Could not save the note.");
-      return;
-    }
     elements.noteTextInput.value = "";
     elements.noteCategoryInput.value = "";
     appState.memory = data.memory;
     refreshMemoryViews();
-  } catch (err) {
-    addMessage("system", `Failed to save note: ${err.message}`);
-  }
+  } catch (err) {}
 }
 
 async function saveMessageAsNote(bodyEl, messageEl) {
-  // Use selected text within the message if any, otherwise full text content
   const selection = window.getSelection();
   let noteText = "";
-
   if (selection && selection.toString().trim() && messageEl.contains(selection.anchorNode)) {
     noteText = selection.toString().trim();
-  } else {
-    noteText = bodyEl.innerText.trim();
-  }
-
-  if (!noteText) {
-    addMessage("system", "Nothing to save - the message is empty.");
-    return;
-  }
-
-  // Truncate very long messages to a reasonable note size
-  if (noteText.length > 500) {
-    noteText = noteText.substring(0, 500) + "...";
-  }
-
+  } else { noteText = bodyEl.innerText.trim(); }
+  if (!noteText) return;
+  if (noteText.length > 500) noteText = noteText.substring(0, 500) + "...";
   try {
     const response = await fetch("/api/notes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: noteText, category: "saved" }),
     });
+    if (!response.ok) return;
     const data = await response.json();
-    if (!response.ok) {
-      addMessage("system", data.error || "Could not save note.");
-      return;
-    }
     appState.memory = data.memory;
     refreshMemoryViews();
-
-    // Visual feedback on the button
     const btn = messageEl.querySelector(".message-action-btn");
     if (btn) {
       const original = btn.innerHTML;
       btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>Saved!</span>';
       btn.classList.add("saved");
-      setTimeout(() => {
-        btn.innerHTML = original;
-        btn.classList.remove("saved");
-      }, 2000);
+      setTimeout(() => { btn.innerHTML = original; btn.classList.remove("saved"); }, 2000);
     }
-  } catch (err) {
-    addMessage("system", `Failed to save note: ${err.message}`);
-  }
+  } catch (err) {}
 }
 
 // ---------- File Attachment ----------
@@ -1649,13 +1548,10 @@ async function saveMessageAsNote(bodyEl, messageEl) {
 async function handleFileAttach() {
   const files = elements.fileAttachInput.files;
   if (!files || files.length === 0) return;
-
-  // Auto-create session if none exists
   if (!appState.activeSessionId) {
     try {
       const sessionRes = await fetch("/api/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: "File attachment chat" }),
       });
       const sessionData = await sessionRes.json();
@@ -1663,56 +1559,31 @@ async function handleFileAttach() {
         appState.activeSessionId = sessionData.session.session_id;
         await refreshSessions();
       }
-    } catch (err) {
-      addMessage("system", `Failed to create session: ${err.message}`);
-      elements.fileAttachInput.value = "";
-      return;
-    }
+    } catch (err) { elements.fileAttachInput.value = ""; return; }
   }
 
   for (const file of files) {
-    const allowedExts = [".pdf", ".docx", ".doc", ".txt", ".md", ".csv", ".json"];
+    const allowedExts = SUPPORTED_FILE_EXTS;
     const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
-    if (!allowedExts.includes(ext)) {
-      addMessage("system", `Unsupported file type: ${ext}. Allowed: ${allowedExts.join(", ")}`);
-      continue;
-    }
-
-    if (file.size > 20 * 1024 * 1024) {
-      addMessage("system", `File too large: ${file.name}. Maximum 20 MB.`);
-      continue;
-    }
-
+    if (!allowedExts.includes(ext)) { addMessage("system", `Unsupported file type: ${ext}`); continue; }
+    if (file.size > 20 * 1024 * 1024) continue;
     addMessage("system", `Uploading ${file.name}...`);
-
     try {
       const base64Data = await fileToBase64(file);
       const response = await fetch(`/api/sessions/${appState.activeSessionId}/attachments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename: file.name, data: base64Data }),
       });
       const data = await response.json();
-      if (!response.ok) {
-        addMessage("system", data.error || `Failed to upload ${file.name}.`);
-        continue;
-      }
-
-      const chunks = data.attachment?.chunk_count ?? "?";
-      const parseErr = data.attachment?.parse_error;
-      if (parseErr) {
-        addMessage("system", `Attached ${file.name} but could not parse for search: ${parseErr}`);
+      if (!response.ok) continue;
+      if (data.attachment?.parse_error) {
+        addMessage("system", `Attached ${file.name} but could not parse for search: ${data.attachment.parse_error}`);
       } else {
-        addMessage("system", `Attached ${file.name} (${chunks} chunks indexed). You can now ask questions about it.`);
+        addMessage("system", `Attached ${file.name}. You can now ask questions about it.`);
       }
-      // Update attach button visual
       elements.attachFilesBtn.classList.add("active");
-    } catch (err) {
-      addMessage("system", `Upload error for ${file.name}: ${err.message}`);
-    }
+    } catch (err) {}
   }
-
-  // Reset input so the same file can be re-selected
   elements.fileAttachInput.value = "";
 }
 
@@ -1720,7 +1591,6 @@ function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
-      // result is "data:...;base64,XXXX" -- we only want the base64 part
       const result = reader.result;
       const base64 = result.substring(result.indexOf(",") + 1);
       resolve(base64);
@@ -1734,64 +1604,42 @@ function fileToBase64(file) {
 
 async function startScreenShare() {
   try {
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: 2 },
-      audio: false,
-    });
-
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 2 }, audio: false });
     appState.screenStream = stream;
     elements.screenVideo.srcObject = stream;
     await elements.screenVideo.play();
     captureScreenFrame();
-
-    if (appState.captureIntervalId) {
-      clearInterval(appState.captureIntervalId);
-    }
+    if (appState.captureIntervalId) clearInterval(appState.captureIntervalId);
     appState.captureIntervalId = window.setInterval(captureScreenFrame, 2500);
-
     const [track] = stream.getVideoTracks();
-    if (track) {
-      track.addEventListener("ended", stopScreenShare);
-    }
+    if (track) track.addEventListener("ended", stopScreenShare);
     addMessage("system", "Screen sharing is active. Orbit can now use the latest captured frame when you send a message.");
-  } catch (error) {
-    addMessage("system", `Screen sharing was not started: ${error.message}`);
-  }
+  } catch (error) {}
 }
 
 function stopScreenShare() {
-  if (appState.screenStream) {
-    appState.screenStream.getTracks().forEach((track) => track.stop());
-  }
+  if (appState.screenStream) appState.screenStream.getTracks().forEach((track) => track.stop());
   appState.screenStream = null;
   appState.latestScreenImage = null;
   elements.screenVideo.srcObject = null;
-
-  if (appState.captureIntervalId) {
-    clearInterval(appState.captureIntervalId);
-    appState.captureIntervalId = null;
-  }
-
+  if (appState.captureIntervalId) { clearInterval(appState.captureIntervalId); appState.captureIntervalId = null; }
   const context = elements.screenPreview.getContext("2d");
   context.clearRect(0, 0, elements.screenPreview.width, elements.screenPreview.height);
 }
 
 function captureScreenFrame() {
   if (!elements.screenVideo.videoWidth || !elements.screenVideo.videoHeight) return;
-
   const context = elements.screenPreview.getContext("2d");
-  const maxWidth = 1280;
-  const scale = Math.min(1, maxWidth / elements.screenVideo.videoWidth);
+  const scale = Math.min(1, 1280 / elements.screenVideo.videoWidth);
   const width = Math.round(elements.screenVideo.videoWidth * scale);
   const height = Math.round(elements.screenVideo.videoHeight * scale);
-
   elements.screenPreview.width = width;
   elements.screenPreview.height = height;
   context.drawImage(elements.screenVideo, 0, 0, width, height);
   appState.latestScreenImage = elements.screenPreview.toDataURL("image/jpeg", 0.82);
 }
 
-// ---------- Composer State ----------
+// ---------- Utility ----------
 
 function getThinkingStatus() {
   if (appState.webSearchActive) return { text: "Searching Online...", copy: "Orbit is searching the web." };
@@ -1805,8 +1653,6 @@ function setComposerState(isBusy) {
   elements.quickActions.forEach((button) => (button.disabled = isBusy));
   elements.practiceButtons.forEach((button) => (button.disabled = isBusy));
 }
-
-// ---------- Utility Functions ----------
 
 function getSelectedLanguageLabel(value) {
   const selected = VOICE_LANGUAGE_OPTIONS.find((option) => option.value === value);
@@ -1843,44 +1689,10 @@ function formatLinks(container) {
   });
 }
 
-// ---------- Streaming Text Effect ----------
-async function streamMarkdown(container, text, speed = 15) {
-  const html = typeof marked !== "undefined" ? marked.parse(text) : text;
-  container.innerHTML = "";
-  
-  const tokens = html.split(/(<[^>]+>)/g);
-  let currentHTML = "";
-
-  for (let i = 0; i < tokens.length; i++) {
-    const token = tokens[i];
-    if (token.startsWith("<")) {
-      currentHTML += token;
-      container.innerHTML = currentHTML;
-    } else {
-      const words = token.split(/(\s+)/);
-      for (let j = 0; j < words.length; j++) {
-        currentHTML += words[j];
-        container.innerHTML = currentHTML + '<span class="streaming-cursor"></span>';
-        elements.messageList.scrollTop = elements.messageList.scrollHeight;
-        await new Promise((r) => setTimeout(r, speed));
-      }
-    }
-  }
-  
-  container.innerHTML = currentHTML;
-  formatLinks(container);
-
-  // --- NEW: Render Math/LaTeX ---
-  if (typeof renderMathInElement === "function") {
-    renderMathInElement(container, {
-      delimiters: [
-        {left: "$$", right: "$$", display: true},
-        {left: "\\[", right: "\\]", display: true},
-        {left: "$", right: "$", display: false},
-        {left: "\\(", right: "\\)", display: false}
-      ],
-      throwOnError: false,
-      output: "html" // renders cleanly without relying on MathML fonts
-    });
-  }
+// ---------- Global Dropdown Listeners ----------
+function closeAllDropdowns() {
+  document.querySelectorAll(".dropdown-menu.show").forEach(d => d.classList.remove("show"));
+  document.querySelectorAll(".session-actions-btn.menu-open").forEach(b => b.classList.remove("menu-open"));
 }
+
+document.addEventListener("click", closeAllDropdowns);

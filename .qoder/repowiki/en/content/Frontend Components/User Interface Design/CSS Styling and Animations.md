@@ -6,7 +6,16 @@
 - [index.html](file://frontend/index.html)
 - [app.js](file://frontend/scripts/app.js)
 - [avatar-renderer.js](file://frontend/scripts/avatar-renderer.js)
+- [avatar-worker.js](file://frontend/scripts/avatar-worker.js)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Added comprehensive documentation for Smart Routing toggle states and dynamic visibility controls
+- Enhanced utility drawer panel documentation with new form elements and responsive design
+- Updated button states and visual feedback systems for model switching
+- Expanded responsive design improvements section with new breakpoint behaviors
+- Added detailed coverage of new toggle chip states and their CSS implementations
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -21,7 +30,9 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-This document describes the Orbit Virtual Assistant’s CSS styling and animation system. It covers the color palette, typography hierarchy, spacing conventions, layout patterns (flexbox and CSS Grid), responsive breakpoints, theme variable usage, and micro-interactions. It also explains how the avatar expressions are driven by CSS custom properties and JavaScript, and how transitions and animations are implemented for a polished user experience.
+This document describes the Orbit Virtual Assistant's CSS styling and animation system. It covers the color palette, typography hierarchy, spacing conventions, layout patterns (flexbox and CSS Grid), responsive breakpoints, theme variable usage, and micro-interactions. It also explains how the avatar expressions are driven by CSS custom properties and JavaScript, and how transitions and animations are implemented for a polished user experience.
+
+**Updated** Enhanced to include Smart Routing toggle states, utility drawer panel improvements, and enhanced visual feedback for model switching capabilities.
 
 ## Project Structure
 The styling system is centralized in a single stylesheet and integrated with HTML markup and JavaScript logic that updates CSS variables at runtime.
@@ -31,17 +42,19 @@ graph TB
 HTML["index.html<br/>App layout, panels, avatar stage"] --> CSS["styles.css<br/>Variables, base, layout, components, animations, responsive"]
 JS["app.js<br/>UI state, avatar worker, DOM updates"] --> CSS
 AV["avatar-renderer.js<br/>Canvas avatar drawing"] --> JS
+AW["avatar-worker.js<br/>Animation frame generation"] --> AV
 ```
 
 **Diagram sources**
-- [index.html:11-327](file://frontend/index.html#L11-L327)
-- [styles.css:1-1510](file://frontend/assets/styles.css#L1-L1510)
+- [index.html:11-352](file://frontend/index.html#L11-L352)
+- [styles.css:1-1570](file://frontend/assets/styles.css#L1-L1570)
 - [app.js:538-565](file://frontend/scripts/app.js#L538-L565)
 - [avatar-renderer.js:1-106](file://frontend/scripts/avatar-renderer.js#L1-L106)
+- [avatar-worker.js:1-48](file://frontend/scripts/avatar-worker.js#L1-L48)
 
 **Section sources**
-- [index.html:11-327](file://frontend/index.html#L11-L327)
-- [styles.css:1-1510](file://frontend/assets/styles.css#L1-L1510)
+- [index.html:11-352](file://frontend/index.html#L11-L352)
+- [styles.css:1-1570](file://frontend/assets/styles.css#L1-L1570)
 
 ## Core Components
 - CSS custom properties define theme tokens for colors, surfaces, shadows, radii, and transitions.
@@ -58,6 +71,8 @@ Key areas:
 - Utility drawer panels and forms
 - Animations and responsive media queries
 
+**Updated** Enhanced with Smart Routing toggle states and utility drawer panel improvements.
+
 **Section sources**
 - [styles.css:7-47](file://frontend/assets/styles.css#L7-L47)
 - [styles.css:100-128](file://frontend/assets/styles.css#L100-L128)
@@ -68,7 +83,7 @@ Key areas:
 - [styles.css:1319-1494](file://frontend/assets/styles.css#L1319-L1494)
 
 ## Architecture Overview
-The UI is composed of three primary regions: left sidebar, main chat area, and right utility drawer. The avatar mini stage resides in the chat header and reflects runtime state via CSS variables. The coach panel appears conditionally in “Coach” mode and uses a CSS Grid for field layout.
+The UI is composed of three primary regions: left sidebar, main chat area, and right utility drawer. The avatar mini stage resides in the chat header and reflects runtime state via CSS variables. The coach panel appears conditionally in "Coach" mode and uses a CSS Grid for field layout.
 
 ```mermaid
 graph TB
@@ -160,6 +175,8 @@ Responsive layout:
 - On small screens, the coach grid switches to a single column.
 - Utility drawer becomes a fixed overlay on narrow widths.
 
+**Updated** Enhanced with Smart Routing toggle state management and utility drawer panel optimizations.
+
 **Section sources**
 - [styles.css:100-128](file://frontend/assets/styles.css#L100-L128)
 - [styles.css:516-520](file://frontend/assets/styles.css#L516-L520)
@@ -172,11 +189,60 @@ Responsive layout:
 - Composer toggles and chips reflect active states with color and background tokens.
 - Utility drawer forms and small buttons follow consistent focus and hover behaviors.
 
+**Updated** Enhanced with Smart Routing toggle states and improved visual feedback for model switching.
+
 **Section sources**
 - [styles.css:212-278](file://frontend/assets/styles.css#L212-L278)
 - [styles.css:579-680](file://frontend/assets/styles.css#L579-L680)
 - [styles.css:729-794](file://frontend/assets/styles.css#L729-L794)
 - [styles.css:1045-1151](file://frontend/assets/styles.css#L1045-L1151)
+
+### Smart Routing Toggle States and Model Switching Feedback
+
+**New Section** The Smart Routing feature introduces dynamic toggle states that provide enhanced visual feedback for model switching capabilities.
+
+Key behaviors:
+- Dynamic visibility based on API configuration (enableHybrid flag)
+- Active state styling with accent color feedback
+- Conditional rendering based on provider capabilities
+- Smooth transitions between routing modes
+
+```mermaid
+sequenceDiagram
+participant UI as "Routing Toggle Chip"
+participant JS as "app.js State Management"
+participant API as "Backend API"
+UI->>JS : Click toggle
+JS->>API : Check enableHybrid capability
+API-->>JS : Return routing capability
+JS->>UI : Update display and active state
+UI-->>UI : Apply active/inactive styling
+```
+
+**Diagram sources**
+- [app.js:764-772](file://frontend/scripts/app.js#L764-L772)
+- [app.js:337-338](file://frontend/scripts/app.js#L337-L338)
+- [index.html:157-160](file://frontend/index.html#L157-L160)
+
+**Section sources**
+- [app.js:764-772](file://frontend/scripts/app.js#L764-L772)
+- [app.js:337-338](file://frontend/scripts/app.js#L337-L338)
+- [index.html:157-160](file://frontend/index.html#L157-L160)
+
+### Utility Drawer Panel Enhancements
+
+**New Section** The utility drawer has been enhanced with improved panel layouts, form elements, and responsive design optimizations.
+
+Key improvements:
+- Enhanced form controls with consistent styling
+- Improved grid layouts for quick actions and practice buttons
+- Better responsive behavior with optimized spacing
+- Enhanced visual hierarchy for panel organization
+
+**Section sources**
+- [styles.css:993-1151](file://frontend/assets/styles.css#L993-L1151)
+- [styles.css:1146-1150](file://frontend/assets/styles.css#L1146-L1150)
+- [index.html:216-340](file://frontend/index.html#L216-L340)
 
 ### Avatar Animation System
 The avatar mini stage displays facial expressions and ambient effects synchronized with runtime states. The JavaScript avatar worker posts animation frame data that updates CSS custom properties on the avatar stage element.
@@ -220,6 +286,8 @@ Examples:
 - Composer send button hover and disabled states.
 - Toggle chips and ghost buttons reflect active and hover states.
 
+**Updated** Enhanced with Smart Routing toggle states and improved visual feedback.
+
 **Section sources**
 - [styles.css:70-84](file://frontend/assets/styles.css#L70-L84)
 - [styles.css:823-835](file://frontend/assets/styles.css#L823-L835)
@@ -246,7 +314,9 @@ Animation keyframes:
 - Sidebar becomes fixed and overlays content on small widths.
 - Coach grid stacks to a single column.
 - Header elements hide or compress on smaller viewports.
-- Toggle chips’ labels disappear on very narrow widths.
+- Toggle chips' labels disappear on very narrow widths.
+
+**Updated** Enhanced with Smart Routing toggle state management and utility drawer optimizations.
 
 Breakpoints:
 - 1024px: utility drawer overlay and coach grid single-column.
@@ -261,14 +331,10 @@ Breakpoints:
 - To add a true dark theme, override :root tokens to invert background and text colors while preserving accent contrasts.
 - Ensure sufficient contrast for text and interactive elements across both palettes.
 
-[No sources needed since this section provides general guidance]
-
 ### Browser Compatibility and Prefixes
 - CSS variables are widely supported in modern browsers.
 - CSS Grid and Flexbox are broadly supported; ensure fallbacks if targeting older environments.
 - Animations and transforms are well supported; test on lower-end devices for performance.
-
-[No sources needed since this section provides general guidance]
 
 ## Dependency Analysis
 The avatar stage depends on JavaScript to update CSS custom properties. The app layout toggles classes to show/hide panels, which drive transitions and visibility.
@@ -286,13 +352,13 @@ CSS["styles.css"] -- "selectors" --> HTML
 - [app.js:538-565](file://frontend/scripts/app.js#L538-L565)
 - [styles.css:100-128](file://frontend/assets/styles.css#L100-L128)
 - [styles.css:994-1011](file://frontend/assets/styles.css#L994-L1011)
-- [index.html:11-327](file://frontend/index.html#L11-L327)
+- [index.html:11-352](file://frontend/index.html#L11-L352)
 
 **Section sources**
 - [app.js:538-565](file://frontend/scripts/app.js#L538-L565)
 - [styles.css:100-128](file://frontend/assets/styles.css#L100-L128)
 - [styles.css:994-1011](file://frontend/assets/styles.css#L994-L1011)
-- [index.html:11-327](file://frontend/index.html#L11-L327)
+- [index.html:11-352](file://frontend/index.html#L11-L352)
 
 ## Performance Considerations
 - Prefer transform and opacity for animations to leverage GPU acceleration.
@@ -301,8 +367,6 @@ CSS["styles.css"] -- "selectors" --> HTML
 - Avoid layout thrashing by batching DOM reads/writes when updating avatar variables.
 - Test animations on low-power devices and reduce frequency or intensity if needed.
 
-[No sources needed since this section provides general guidance]
-
 ## Troubleshooting Guide
 Common issues and resolutions:
 - Avatar not animating: verify the avatar worker is initialized and messages are received; check that CSS variables are being set on the avatar stage element.
@@ -310,6 +374,10 @@ Common issues and resolutions:
 - Sidebar not hiding: confirm the sidebar-collapsed class is toggling and CSS transitions are not overridden.
 - Utility drawer not opening: verify the drawer-open class is toggled and width/min-width transitions are intact.
 - Scrollbars inconsistent: ensure custom scrollbar styles are applied in the relevant containers.
+- Smart Routing toggle not visible: check enableHybrid API flag and routingActive state management.
+- Toggle chips not responding: verify setupToggleChip function binding and active state classes.
+
+**Updated** Enhanced with Smart Routing toggle troubleshooting and utility drawer panel issues.
 
 **Section sources**
 - [app.js:538-565](file://frontend/scripts/app.js#L538-L565)
@@ -319,7 +387,7 @@ Common issues and resolutions:
 ## Conclusion
 The Orbit Virtual Assistant employs a cohesive CSS system centered on custom properties for theme consistency, robust layout primitives (flexbox and grid), and expressive micro-interactions. The avatar animation pipeline integrates tightly with JavaScript to deliver responsive, state-driven visuals. With thoughtful overrides and attention to performance, the system supports easy customization and strong cross-device adaptability.
 
-[No sources needed since this section summarizes without analyzing specific files]
+**Updated** Enhanced with Smart Routing toggle states, utility drawer panel improvements, and improved visual feedback for model switching capabilities.
 
 ## Appendices
 
@@ -328,7 +396,12 @@ The Orbit Virtual Assistant employs a cohesive CSS system centered on custom pro
 - Adjust radii and shadows: modify --radius, --radius-lg, --radius-xl, and shadow tokens.
 - Tune transitions: edit --transition for global easing/duration.
 - Customize avatar expressions: adjust CSS variable thresholds in JavaScript that update --stage-* values.
+- Enable Smart Routing: configure enableHybrid API flag to display routing toggle.
+- Customize utility drawer: modify --drawer-width and panel styling for optimal layout.
+
+**Updated** Enhanced with Smart Routing and utility drawer customization options.
 
 **Section sources**
 - [styles.css:7-47](file://frontend/assets/styles.css#L7-L47)
 - [app.js:548-551](file://frontend/scripts/app.js#L548-L551)
+- [app.js:764-772](file://frontend/scripts/app.js#L764-L772)

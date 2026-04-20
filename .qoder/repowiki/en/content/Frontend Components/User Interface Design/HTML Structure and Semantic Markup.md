@@ -10,6 +10,14 @@
 - [README.md](file://README.md)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Updated Smart Routing toggle button documentation with new hybrid mode functionality
+- Added Quick Actions panel documentation with educational prompts
+- Enhanced Knowledge Lab section with practice button improvements
+- Updated frontend UI controls documentation to include new hybrid mode functionality
+- Added new toggle chip components and their accessibility features
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -37,15 +45,15 @@ C --> E["avatar-renderer.js<br/>Canvas-based avatar renderer"]
 ```
 
 **Diagram sources**
-- [index.html:11-337](file://frontend/index.html#L11-L337)
-- [styles.css:100-1510](file://frontend/assets/styles.css#L100-L1510)
+- [index.html:11-352](file://frontend/index.html#L11-L352)
+- [styles.css:100-1570](file://frontend/assets/styles.css#L100-L1570)
 - [app.js:89-196](file://frontend/scripts/app.js#L89-L196)
 - [avatar-worker.js:1-48](file://frontend/scripts/avatar-worker.js#L1-L48)
 - [avatar-renderer.js:1-106](file://frontend/scripts/avatar-renderer.js#L1-L106)
 
 **Section sources**
-- [index.html:11-337](file://frontend/index.html#L11-L337)
-- [styles.css:100-1510](file://frontend/assets/styles.css#L100-L1510)
+- [index.html:11-352](file://frontend/index.html#L11-L352)
+- [styles.css:100-1570](file://frontend/assets/styles.css#L100-L1570)
 - [app.js:89-196](file://frontend/scripts/app.js#L89-L196)
 
 ## Core Components
@@ -68,12 +76,12 @@ Accessibility and keyboard support:
 **Section sources**
 - [index.html:14-56](file://frontend/index.html#L14-L56)
 - [index.html:59-200](file://frontend/index.html#L59-L200)
-- [index.html:203-327](file://frontend/index.html#L203-L327)
+- [index.html:203-340](file://frontend/index.html#L203-L340)
 - [app.js:137-138](file://frontend/scripts/app.js#L137-L138)
 - [app.js:136-139](file://frontend/scripts/app.js#L136-L139)
 
 ## Architecture Overview
-The HTML structure maps directly to the application’s component hierarchy. The root app-layout container orchestrates the sidebar, main chat area, and utility drawer. The main chat area contains the header, coach panel, message list, tool events, and composer. The utility drawer contains multiple panels for tools and settings.
+The HTML structure maps directly to the application's component hierarchy. The root app-layout container orchestrates the sidebar, main chat area, and utility drawer. The main chat area contains the header, coach panel, message list, tool events, and composer. The utility drawer contains multiple panels for tools and settings.
 
 ```mermaid
 graph TB
@@ -89,7 +97,7 @@ U --> |"Settings & Tools"| M
 ```
 
 **Diagram sources**
-- [index.html:11-337](file://frontend/index.html#L11-L337)
+- [index.html:11-352](file://frontend/index.html#L11-L352)
 
 ## Detailed Component Analysis
 
@@ -182,8 +190,8 @@ Open --> Screen["Screen Share panel<br/>Start/Stop + Preview"]
 Open --> Profile["Profile panel<br/>Forms + Save"]
 Open --> Weather["Weather panel<br/>Refresh + Card"]
 Open --> News["News panel<br/>Refresh + Card"]
-Open --> Quick["Quick Actions<br/>Ghost buttons"]
-Open --> Knowledge["Knowledge Lab<br/>Practice buttons"]
+Open --> Quick["Quick Actions<br/>Educational prompts"]
+Open --> Knowledge["Knowledge Lab<br/>Enhanced practice buttons"]
 Open --> Tasks["Tasks panel<br/>Form + List"]
 Open --> Notes["Memory Notes<br/>Form + List"]
 Voice --> Close(["Close Drawer"])
@@ -198,11 +206,11 @@ Notes --> Close
 ```
 
 **Diagram sources**
-- [index.html:203-327](file://frontend/index.html#L203-L327)
+- [index.html:203-340](file://frontend/index.html#L203-L340)
 - [app.js:466-474](file://frontend/scripts/app.js#L466-L474)
 
 **Section sources**
-- [index.html:203-327](file://frontend/index.html#L203-L327)
+- [index.html:203-340](file://frontend/index.html#L203-L340)
 - [app.js:466-474](file://frontend/scripts/app.js#L466-L474)
 
 ### SVG Icon System
@@ -317,10 +325,38 @@ ChatMain --> composer
 ```
 
 **Diagram sources**
-- [index.html:11-337](file://frontend/index.html#L11-L337)
+- [index.html:11-352](file://frontend/index.html#L11-L352)
 
 **Section sources**
-- [index.html:11-337](file://frontend/index.html#L11-L337)
+- [index.html:11-352](file://frontend/index.html#L11-L352)
+
+### Enhanced Composer Toggle Chips
+The composer now includes several enhanced toggle chips for advanced functionality:
+
+#### Smart Routing Toggle
+- **Purpose**: Auto-upgrades model for complex tasks when enabled
+- **State Management**: Controlled by `routingActive` in appState
+- **Conditional Display**: Hidden if CLI configuration doesn't allow hybrid mode
+- **Routing Mode**: Sends "dynamic" routing mode to backend when active
+
+#### Quick Actions Panel
+- **Purpose**: Educational prompts for common tasks
+- **Features**: Four ghost buttons with predefined prompts
+- **Capabilities**: Daily brief, news updates, screen reading, and personalized lessons
+- **Screen Sharing**: Buttons with `data-needs-screen="true"` require active screen sharing
+
+#### Knowledge Lab Enhancements
+- **Purpose**: Advanced learning and practice tools
+- **Features**: Four practice buttons with educational prompts
+- **Capabilities**: Local docs quiz, screen explanation, ELI5 topics, and study roadmap generation
+- **RAG Integration**: Automatically prepends topic context for local document searches
+
+**Section sources**
+- [index.html:157-183](file://frontend/index.html#L157-L183)
+- [index.html:285-305](file://frontend/index.html#L285-L305)
+- [app.js:408-429](file://frontend/scripts/app.js#L408-L429)
+- [app.js:468-496](file://frontend/scripts/app.js#L468-L496)
+- [app.js:969-977](file://frontend/scripts/app.js#L969-L977)
 
 ## Dependency Analysis
 The HTML depends on CSS for layout and styling, and on JavaScript for dynamic behavior and DOM manipulation. The avatar system uses a Web Worker to compute state and a canvas renderer to draw frames.
@@ -334,14 +370,14 @@ JS --> Renderer["avatar-renderer.js"]
 ```
 
 **Diagram sources**
-- [index.html:11-337](file://frontend/index.html#L11-L337)
-- [styles.css:100-1510](file://frontend/assets/styles.css#L100-L1510)
+- [index.html:11-352](file://frontend/index.html#L11-L352)
+- [styles.css:100-1570](file://frontend/assets/styles.css#L100-L1570)
 - [app.js:89-196](file://frontend/scripts/app.js#L89-L196)
 - [avatar-worker.js:1-48](file://frontend/scripts/avatar-worker.js#L1-L48)
 - [avatar-renderer.js:1-106](file://frontend/scripts/avatar-renderer.js#L1-L106)
 
 **Section sources**
-- [index.html:11-337](file://frontend/index.html#L11-L337)
+- [index.html:11-352](file://frontend/index.html#L11-L352)
 - [app.js:89-196](file://frontend/scripts/app.js#L89-L196)
 - [avatar-worker.js:1-48](file://frontend/scripts/avatar-worker.js#L1-L48)
 - [avatar-renderer.js:1-106](file://frontend/scripts/avatar-renderer.js#L1-L106)
@@ -352,25 +388,23 @@ JS --> Renderer["avatar-renderer.js"]
 - Debounced or throttled operations: avatar worker interval-based updates
 - Responsive design: media queries adjust layout for smaller screens
 
-[No sources needed since this section provides general guidance]
-
 ## Troubleshooting Guide
 Common issues and checks:
 - Voice input not available: Verify browser support and permissions; check voice language select availability
 - Sidebar not toggling: Confirm app-layout CSS classes are applied and persisted in localStorage
 - Composer disabled: Ensure setComposerState is called to re-enable after processing
 - Screen share not working: Check mediaDevices availability and permissions; verify preview canvas sizing
+- Smart Routing toggle hidden: Check CLI configuration for hybrid mode enablement
 
 **Section sources**
 - [app.js:601-727](file://frontend/scripts/app.js#L601-L727)
 - [app.js:494-509](file://frontend/scripts/app.js#L494-L509)
 - [app.js:1722-1727](file://frontend/scripts/app.js#L1722-L1727)
 - [app.js:1655-1697](file://frontend/scripts/app.js#L1655-L1697)
+- [app.js:969-977](file://frontend/scripts/app.js#L969-L977)
 
 ## Conclusion
-The Orbit Virtual Assistant interface is built with a clear semantic HTML structure, a cohesive component hierarchy, and robust JavaScript-driven dynamic content. The layout supports modern browsers with responsive design, while the SVG icon system and accessibility attributes enhance usability. The utility drawer and main chat area provide comprehensive tooling and messaging capabilities, with dynamic insertion points enabling flexible content updates.
-
-[No sources needed since this section summarizes without analyzing specific files]
+The Orbit Virtual Assistant interface is built with a clear semantic HTML structure, a cohesive component hierarchy, and robust JavaScript-driven dynamic content. The layout supports modern browsers with responsive design, while the SVG icon system and accessibility attributes enhance usability. The utility drawer and main chat area provide comprehensive tooling and messaging capabilities, with dynamic insertion points enabling flexible content updates. The enhanced Smart Routing toggle, Quick Actions panel, and Knowledge Lab improvements demonstrate the system's commitment to educational AI assistance and intelligent task automation.
 
 ## Appendices
 
@@ -389,9 +423,13 @@ The Orbit Virtual Assistant interface is built with a clear semantic HTML struct
 - Rendering tool events: renderToolEvents clears and appends tool-pill spans
 - Session rendering: renderSessions builds session-item elements and toggles visibility of groups
 - Avatar state updates: setStageState updates dataset and CSS custom properties
+- Smart Routing integration: Conditional display based on CLI configuration
+- Quick Actions handling: Event delegation for educational prompt execution
 
 **Section sources**
 - [app.js:1091-1139](file://frontend/scripts/app.js#L1091-L1139)
 - [app.js:1141-1149](file://frontend/scripts/app.js#L1141-L1149)
 - [app.js:1153-1187](file://frontend/scripts/app.js#L1153-L1187)
 - [app.js:556-565](file://frontend/scripts/app.js#L556-L565)
+- [app.js:969-977](file://frontend/scripts/app.js#L969-L977)
+- [app.js:468-496](file://frontend/scripts/app.js#L468-L496)
