@@ -80,6 +80,7 @@ class LLMAssistant:
         routing_mode: str = "fixed",
         override_provider: str | None = None,
         override_model: str | None = None,
+        use_memory: bool = True,
     ) -> AssistantResult:
         
         target_provider = override_provider or self.settings.active_provider
@@ -107,26 +108,28 @@ class LLMAssistant:
             recent_conversation=conversation or [],
             web_search_only=web_search_only,
             offline_mode=offline_mode,
+            use_memory=use_memory,
         )
 
         if target_provider in ["openrouter", "lm_studio", "ollama"]:
             return await self._chat_openrouter(
                 message, conversation or [], screen_image, instructions, 
                 web_search_only, offline_mode, session_id,
-                target_model, target_provider, current_api_key
+                target_model, target_provider, current_api_key, use_memory
             )
         else:
             return await self._chat_google(
                 message, conversation or [], screen_image, instructions, 
                 web_search_only, offline_mode, session_id,
-                target_model, current_api_key
+                target_model, current_api_key, use_memory
             )
 
     async def _chat_openrouter(
         self, message: str, conversation: list[dict[str, str]], 
         screen_image: str | None, instructions: str, 
         web_search_only: bool, offline_mode: bool, session_id: str | None,
-        current_model: str, current_provider: str, current_api_key: str
+        current_model: str, current_provider: str, current_api_key: str,
+        use_memory: bool,
     ) -> AssistantResult:
         
         trigger_phrases = ["do you know", "who is", "what is", "tell me about", "give me information on", "details about"]
@@ -157,6 +160,7 @@ class LLMAssistant:
             web_search_only=web_search_only,
             offline_mode=offline_mode,
             enable_session_docs=has_session_docs,
+            enable_memory=use_memory,
         )
         tools = [{"type": "function", "function": f} for f in google_tools[0]["functionDeclarations"]]
         tool_events: list[dict[str, Any]] = []
@@ -230,7 +234,8 @@ class LLMAssistant:
                     run_tool_call,
                     self.memory_store, self.weather_service, self.news_service,
                     self.knowledge_service, self.web_search_service,
-                    name=name, arguments=args, call_id=call_id, session_id=session_id
+                    name=name, arguments=args, call_id=call_id, session_id=session_id,
+                    allow_memory=use_memory,
                 )
                 tool_events.append(tool_result.event)
                 messages.append({
@@ -246,7 +251,7 @@ class LLMAssistant:
         self, message: str, conversation: list[dict[str, str]], 
         screen_image: str | None, instructions: str, 
         web_search_only: bool, offline_mode: bool, session_id: str | None,
-        current_model: str, current_api_key: str
+        current_model: str, current_api_key: str, use_memory: bool
     ) -> AssistantResult:
         
         contents = self._build_google_contents(message, conversation, screen_image)
@@ -265,6 +270,7 @@ class LLMAssistant:
                     web_search_only=web_search_only,
                     offline_mode=offline_mode,
                     enable_session_docs=has_session_docs,
+                    enable_memory=use_memory,
                 ),
             }
 
@@ -292,7 +298,8 @@ class LLMAssistant:
                     run_tool_call,
                     self.memory_store, self.weather_service, self.news_service,
                     self.knowledge_service, self.web_search_service,
-                    name=fc.get("name", ""), arguments=fc.get("args", {}), call_id=fc.get("id"), session_id=session_id
+                    name=fc.get("name", ""), arguments=fc.get("args", {}), call_id=fc.get("id"),
+                    session_id=session_id, allow_memory=use_memory
                 )
                 tool_events.append(tool_result.event)
                 function_response_parts.append({"functionResponse": tool_result.function_response})

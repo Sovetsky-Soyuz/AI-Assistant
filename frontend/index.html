@@ -276,8 +276,19 @@
             <canvas id="screenPreview" width="640" height="360"></canvas>
           </section>
 
-          <!-- Profile -->
           <section class="drawer-panel">
+            <div class="drawer-panel-head">
+              <h3 class="drawer-panel-title">Agent Memory</h3>
+              <div class="drawer-panel-actions">
+                <button id="enableMemoryBtn" type="button" class="small-btn ghost">Allow</button>
+                <button id="disableMemoryBtn" type="button" class="small-btn ghost">Disable</button>
+              </div>
+            </div>
+            <p class="drawer-hint" id="memoryConsentStatus">Checking memory preference...</p>
+          </section>
+
+          <!-- Profile -->
+          <section class="drawer-panel" data-memory-gated="true">
             <h3 class="drawer-panel-title">Profile</h3>
             <form id="profileForm" class="drawer-form">
               <input id="displayNameInput" type="text" placeholder="Your name" />
@@ -332,7 +343,7 @@
           </section>
 
           <!-- Tasks -->
-          <section class="drawer-panel">
+          <section class="drawer-panel" data-memory-gated="true">
             <h3 class="drawer-panel-title">Tasks</h3>
             <form id="taskForm" class="drawer-form">
               <input id="taskTitleInput" type="text" placeholder="Add a task" />
@@ -350,7 +361,7 @@
           </section>
 
           <!-- Memory Notes -->
-          <section class="drawer-panel">
+          <section class="drawer-panel" data-memory-gated="true">
             <h3 class="drawer-panel-title">Memory</h3>
             <p class="drawer-hint" id="memoryHint">Recent notes appear when Orbit remembers something for later.</p>
             <form id="noteForm" class="drawer-form">

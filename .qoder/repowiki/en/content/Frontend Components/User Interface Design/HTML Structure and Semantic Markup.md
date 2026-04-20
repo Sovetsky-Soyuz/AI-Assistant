@@ -12,11 +12,13 @@
 
 ## Update Summary
 **Changes Made**
-- Updated Smart Routing toggle button documentation with new hybrid mode functionality
-- Added Quick Actions panel documentation with educational prompts
-- Enhanced Knowledge Lab section with practice button improvements
-- Updated frontend UI controls documentation to include new hybrid mode functionality
-- Added new toggle chip components and their accessibility features
+- Enhanced accessibility features with improved semantic HTML structure and ARIA attributes
+- Refined component organization with better separation of concerns and modular design
+- Improved integration with updated backend APIs including enhanced session management and memory handling
+- Added new utility drawer functionality with memory-gated panels and enhanced agent memory controls
+- Enhanced coach mode interface elements with improved form controls and validation
+- Implemented session dropdown menus with proper accessibility and keyboard navigation support
+- Added file attachment functionality with secure file handling and validation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -45,15 +47,15 @@ C --> E["avatar-renderer.js<br/>Canvas-based avatar renderer"]
 ```
 
 **Diagram sources**
-- [index.html:11-352](file://frontend/index.html#L11-L352)
-- [styles.css:100-1570](file://frontend/assets/styles.css#L100-L1570)
+- [index.html:11-390](file://frontend/index.html#L11-L390)
+- [styles.css:100-1625](file://frontend/assets/styles.css#L100-L1625)
 - [app.js:89-196](file://frontend/scripts/app.js#L89-L196)
 - [avatar-worker.js:1-48](file://frontend/scripts/avatar-worker.js#L1-L48)
 - [avatar-renderer.js:1-106](file://frontend/scripts/avatar-renderer.js#L1-L106)
 
 **Section sources**
-- [index.html:11-352](file://frontend/index.html#L11-L352)
-- [styles.css:100-1570](file://frontend/assets/styles.css#L100-L1570)
+- [index.html:11-390](file://frontend/index.html#L11-L390)
+- [styles.css:100-1625](file://frontend/assets/styles.css#L100-L1625)
 - [app.js:89-196](file://frontend/scripts/app.js#L89-L196)
 
 ## Core Components
@@ -63,32 +65,34 @@ The interface is organized around a responsive layout with three primary regions
 - Right utility drawer: tools, settings, profile, weather, news, tasks, and notes
 
 Key semantic sections and insertion points:
-- Sidebar navigation groups for pinned, recent, and archived chats
+- Sidebar navigation groups for pinned, recent, and archived chats with dropdown menus
 - Message list container for dynamically appended message nodes
 - Tool events container for dynamic tool activity indicators
-- Utility drawer panels for settings, profile, weather, news, tasks, and notes
+- Utility drawer panels for settings, profile, weather, news, tasks, and notes with memory gating
+- Session dropdown menus with proper accessibility attributes
 
 Accessibility and keyboard support:
 - Buttons include titles and icons for affordances
 - Voice input uses keyboard shortcuts (Ctrl+M, Control key)
 - Focus management and disabled states are handled programmatically
+- Dropdown menus support keyboard navigation and ARIA attributes
 
 **Section sources**
 - [index.html:14-56](file://frontend/index.html#L14-L56)
 - [index.html:59-200](file://frontend/index.html#L59-L200)
-- [index.html:203-340](file://frontend/index.html#L203-L340)
+- [index.html:203-340](file://frontend/index.html#L203-L390)
 - [app.js:137-138](file://frontend/scripts/app.js#L137-L138)
 - [app.js:136-139](file://frontend/scripts/app.js#L136-L139)
 
 ## Architecture Overview
-The HTML structure maps directly to the application's component hierarchy. The root app-layout container orchestrates the sidebar, main chat area, and utility drawer. The main chat area contains the header, coach panel, message list, tool events, and composer. The utility drawer contains multiple panels for tools and settings.
+The HTML structure maps directly to the application's component hierarchy. The root app-layout container orchestrates the sidebar, main chat area, and utility drawer. The main chat area contains the header, coach panel, message list, tool events, and composer. The utility drawer contains multiple panels for tools and settings with enhanced memory management capabilities.
 
 ```mermaid
 graph TB
 subgraph "App Layout"
-S["Sidebar<br/>Navigation Groups"]
+S["Sidebar<br/>Navigation Groups + Dropdown Menus"]
 M["Main Chat Area<br/>Header + Message List + Composer"]
-U["Utility Drawer<br/>Panels"]
+U["Utility Drawer<br/>Panels + Memory Gating"]
 end
 S --> |"Session Lists"| M
 M --> |"Dynamic Content"| M
@@ -97,7 +101,7 @@ U --> |"Settings & Tools"| M
 ```
 
 **Diagram sources**
-- [index.html:11-352](file://frontend/index.html#L11-L352)
+- [index.html:11-390](file://frontend/index.html#L11-L390)
 
 ## Detailed Component Analysis
 
@@ -116,6 +120,7 @@ U --> |"Settings & Tools"| M
 - Groups: Pinned chats, Recent chats, Archived chats
 - Interaction: Clicking items loads sessions; context menu appears on hover
 - Accessibility: Hover-triggered dropdowns; focus-visible behavior managed by CSS
+- Enhanced: Session dropdown menus with proper ARIA attributes and keyboard navigation
 
 ```mermaid
 flowchart TD
@@ -182,11 +187,14 @@ App-->>Composer : update state (enable/disable)
 ### Utility Drawer
 - Structure: Header with title and close button; scrollable panels for Voice, Screen Share, Profile, Weather, News, Quick Actions, Knowledge Lab, Tasks, and Memory Notes
 - Interaction: Panels expand/collapse; forms submit to backend; buttons trigger actions
+- Enhanced: Memory-gated panels with conditional access based on user consent
+- Features: Agent Memory controls, profile management, task and note management
 
 ```mermaid
 flowchart TD
 Open(["Open Drawer"]) --> Voice["Voice panel<br/>Toggle + Language select"]
 Open --> Screen["Screen Share panel<br/>Start/Stop + Preview"]
+Open --> Memory["Agent Memory panel<br/>Enable/Disable + Consent"]
 Open --> Profile["Profile panel<br/>Forms + Save"]
 Open --> Weather["Weather panel<br/>Refresh + Card"]
 Open --> News["News panel<br/>Refresh + Card"]
@@ -196,6 +204,7 @@ Open --> Tasks["Tasks panel<br/>Form + List"]
 Open --> Notes["Memory Notes<br/>Form + List"]
 Voice --> Close(["Close Drawer"])
 Screen --> Close
+Memory --> Close
 Profile --> Close
 Weather --> Close
 News --> Close
@@ -206,11 +215,11 @@ Notes --> Close
 ```
 
 **Diagram sources**
-- [index.html:203-340](file://frontend/index.html#L203-L340)
+- [index.html:203-390](file://frontend/index.html#L203-L390)
 - [app.js:466-474](file://frontend/scripts/app.js#L466-L474)
 
 **Section sources**
-- [index.html:203-340](file://frontend/index.html#L203-L340)
+- [index.html:203-390](file://frontend/index.html#L203-L390)
 - [app.js:466-474](file://frontend/scripts/app.js#L466-L474)
 
 ### SVG Icon System
@@ -241,6 +250,8 @@ Examples of icon usage:
   - ESC: Cancel Mode A recording
 - Disabled states are applied to inputs and buttons during processing
 - Focus management occurs on form submission and input resizing
+- Dropdown menus support keyboard navigation and ARIA attributes
+- Session dropdown menus include proper accessibility markup
 
 **Section sources**
 - [index.html:17-23](file://frontend/index.html#L17-L23)
@@ -252,8 +263,9 @@ Examples of icon usage:
 ### Dynamic Content Insertion Points
 - messageList: Dynamically appended article elements for user, assistant, and system messages
 - toolEvents: Dynamically appended tool-pill spans
-- session lists: Pinned, recent, and archived session lists
-- Utility drawer lists: Weather, news, tasks, and notes lists
+- session lists: Pinned, recent, and archived session lists with dropdown menus
+- Utility drawer lists: Weather, news, tasks, and notes lists with memory gating
+- Session dropdown menus: Contextual actions for chat management
 
 ```mermaid
 flowchart TD
@@ -325,31 +337,31 @@ ChatMain --> composer
 ```
 
 **Diagram sources**
-- [index.html:11-352](file://frontend/index.html#L11-L352)
+- [index.html:11-390](file://frontend/index.html#L11-L390)
 
 **Section sources**
-- [index.html:11-352](file://frontend/index.html#L11-L352)
+- [index.html:11-390](file://frontend/index.html#L11-L390)
 
-### Enhanced Composer Toggle Chips
-The composer now includes several enhanced toggle chips for advanced functionality:
+### Enhanced Session Management
+The interface now includes sophisticated session management with enhanced accessibility and functionality:
 
-#### Smart Routing Toggle
-- **Purpose**: Auto-upgrades model for complex tasks when enabled
-- **State Management**: Controlled by `routingActive` in appState
-- **Conditional Display**: Hidden if CLI configuration doesn't allow hybrid mode
-- **Routing Mode**: Sends "dynamic" routing mode to backend when active
+#### Session Dropdown Menus
+- **Purpose**: Contextual actions for chat management
+- **Features**: Rename, Pin/Unpin, Archive/Unarchive, Delete operations
+- **Accessibility**: Proper ARIA attributes, keyboard navigation, and focus management
+- **Security**: Confirmation dialogs for destructive actions
 
-#### Quick Actions Panel
-- **Purpose**: Educational prompts for common tasks
-- **Features**: Four ghost buttons with predefined prompts
-- **Capabilities**: Daily brief, news updates, screen reading, and personalized lessons
-- **Screen Sharing**: Buttons with `data-needs-screen="true"` require active screen sharing
+#### Memory-Gated Panels
+- **Purpose**: Conditional access to sensitive features based on user consent
+- **Features**: Profile, Tasks, and Notes panels are disabled when memory is not enabled
+- **User Experience**: Clear visual indication of locked/unlocked state
+- **Functionality**: Automatic form disabling and helpful messaging
 
-#### Knowledge Lab Enhancements
-- **Purpose**: Advanced learning and practice tools
-- **Features**: Four practice buttons with educational prompts
-- **Capabilities**: Local docs quiz, screen explanation, ELI5 topics, and study roadmap generation
-- **RAG Integration**: Automatically prepends topic context for local document searches
+#### File Attachment System
+- **Purpose**: Secure file upload and processing
+- **Features**: Multiple file support with validation, hidden input for security
+- **Security**: MIME type restrictions and size limits
+- **Integration**: Seamless integration with chat composer
 
 **Section sources**
 - [index.html:157-183](file://frontend/index.html#L157-L183)
@@ -370,14 +382,14 @@ JS --> Renderer["avatar-renderer.js"]
 ```
 
 **Diagram sources**
-- [index.html:11-352](file://frontend/index.html#L11-L352)
-- [styles.css:100-1570](file://frontend/assets/styles.css#L100-L1570)
+- [index.html:11-390](file://frontend/index.html#L11-L390)
+- [styles.css:100-1625](file://frontend/assets/styles.css#L100-L1625)
 - [app.js:89-196](file://frontend/scripts/app.js#L89-L196)
 - [avatar-worker.js:1-48](file://frontend/scripts/avatar-worker.js#L1-L48)
 - [avatar-renderer.js:1-106](file://frontend/scripts/avatar-renderer.js#L1-L106)
 
 **Section sources**
-- [index.html:11-352](file://frontend/index.html#L11-L352)
+- [index.html:11-390](file://frontend/index.html#L11-L390)
 - [app.js:89-196](file://frontend/scripts/app.js#L89-L196)
 - [avatar-worker.js:1-48](file://frontend/scripts/avatar-worker.js#L1-L48)
 - [avatar-renderer.js:1-106](file://frontend/scripts/avatar-renderer.js#L1-L106)
@@ -387,6 +399,8 @@ JS --> Renderer["avatar-renderer.js"]
 - Scroll management: messageList autoscrolls to bottom after appending
 - Debounced or throttled operations: avatar worker interval-based updates
 - Responsive design: media queries adjust layout for smaller screens
+- Memory management: Conditional loading of memory-gated features reduces unnecessary DOM
+- File handling: Secure file input with proper validation and cleanup
 
 ## Troubleshooting Guide
 Common issues and checks:
@@ -395,6 +409,9 @@ Common issues and checks:
 - Composer disabled: Ensure setComposerState is called to re-enable after processing
 - Screen share not working: Check mediaDevices availability and permissions; verify preview canvas sizing
 - Smart Routing toggle hidden: Check CLI configuration for hybrid mode enablement
+- Session dropdown not working: Verify dropdown menu IDs and event handlers are properly bound
+- Memory-gated panels disabled: Check user consent and memory enablement status
+- File attachments failing: Verify file input validation and MIME type restrictions
 
 **Section sources**
 - [app.js:601-727](file://frontend/scripts/app.js#L601-L727)
@@ -404,7 +421,7 @@ Common issues and checks:
 - [app.js:969-977](file://frontend/scripts/app.js#L969-L977)
 
 ## Conclusion
-The Orbit Virtual Assistant interface is built with a clear semantic HTML structure, a cohesive component hierarchy, and robust JavaScript-driven dynamic content. The layout supports modern browsers with responsive design, while the SVG icon system and accessibility attributes enhance usability. The utility drawer and main chat area provide comprehensive tooling and messaging capabilities, with dynamic insertion points enabling flexible content updates. The enhanced Smart Routing toggle, Quick Actions panel, and Knowledge Lab improvements demonstrate the system's commitment to educational AI assistance and intelligent task automation.
+The Orbit Virtual Assistant interface is built with a clear semantic HTML structure, a cohesive component hierarchy, and robust JavaScript-driven dynamic content. The layout supports modern browsers with responsive design, while the SVG icon system and accessibility attributes enhance usability. The utility drawer and main chat area provide comprehensive tooling and messaging capabilities, with dynamic insertion points enabling flexible content updates. The enhanced session management, memory-gated panels, and file attachment system demonstrate the system's commitment to user privacy, accessibility, and intelligent task automation.
 
 ## Appendices
 
@@ -412,6 +429,7 @@ The Orbit Virtual Assistant interface is built with a clear semantic HTML struct
 - Modern HTML5 features: form elements, media devices, Web Workers, canvas, and CSS variables
 - Progressive enhancement: fallbacks for voice synthesis, speech recognition, and avatar rendering
 - Polyfills and graceful degradation are implied by feature detection and fallback messaging
+- Enhanced accessibility: ARIA attributes, keyboard navigation, and screen reader support
 
 **Section sources**
 - [README.md:59](file://README.md#L59)
@@ -425,6 +443,9 @@ The Orbit Virtual Assistant interface is built with a clear semantic HTML struct
 - Avatar state updates: setStageState updates dataset and CSS custom properties
 - Smart Routing integration: Conditional display based on CLI configuration
 - Quick Actions handling: Event delegation for educational prompt execution
+- Session dropdown menus: Dynamic creation of contextual action menus
+- Memory-gated panels: Conditional rendering based on user consent
+- File attachment handling: Secure file input with validation and processing
 
 **Section sources**
 - [app.js:1091-1139](file://frontend/scripts/app.js#L1091-L1139)
@@ -433,3 +454,6 @@ The Orbit Virtual Assistant interface is built with a clear semantic HTML struct
 - [app.js:556-565](file://frontend/scripts/app.js#L556-L565)
 - [app.js:969-977](file://frontend/scripts/app.js#L969-L977)
 - [app.js:468-496](file://frontend/scripts/app.js#L468-L496)
+- [app.js:1320-1411](file://frontend/scripts/app.js#L1320-L1411)
+- [app.js:726-814](file://frontend/scripts/app.js#L726-L814)
+- [app.js:1688-1700](file://frontend/scripts/app.js#L1688-L1700)

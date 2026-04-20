@@ -36,6 +36,7 @@ class ChatRequest(BaseModel):
     routingMode: Optional[str] = "fixed"
     providerOverride: Optional[str] = None
     modelOverride: Optional[str] = None
+    useMemory: Optional[bool] = True
 
 class SessionCreateRequest(BaseModel):
     title: Optional[str] = None
@@ -86,15 +87,15 @@ def init_services(current_settings: Settings, rag_path: str | None = None):
     news_svc = NewsService()
 
 @app.get("/api/state")
-async def get_state():
+async def get_state(include_memory: bool = True):
     return {
         "provider": settings.provider_name,
         "hasApiKey": bool(settings.current_api_key),
         "model": settings.ai_model,
         "defaultLocation": settings.default_location,
         "liveVoiceName": settings.live_voice_name,
-        "memory": memory_store.get_state(),
-        "history": memory_store.get_history(),
+        "memory": memory_store.get_state() if include_memory else None,
+        "history": memory_store.get_history() if include_memory else [],
         "sessions": memory_store.get_sessions(include_archived=True),
         "enableHybrid": getattr(settings, 'enable_hybrid', False),
     }
@@ -158,9 +159,15 @@ async def delete_session(session_id: str):
 async def handle_chat(payload: ChatRequest):
     UNSUPPORTED_REFUSAL = "Sorry, I don't have this function. Please use other LLMs that support this."
     used_model = payload.modelOverride or settings.ai_model
+    use_memory = payload.useMemory if payload.useMemory is not None else True
     
     if payload.imageGen:
-        return {"reply": UNSUPPORTED_REFUSAL, "toolEvents": [], "memory": memory_store.get_state(), "model": used_model}
+        return {
+            "reply": UNSUPPORTED_REFUSAL,
+            "toolEvents": [],
+            "memory": memory_store.get_state() if use_memory else None,
+            "model": used_model,
+        }
 
     try:
         # TỪ KHÓA AWAIT QUAN TRỌNG: Đợi LLM suy nghĩ xong 100% rồi mới chạy tiếp
@@ -177,32 +184,35 @@ async def handle_chat(payload: ChatRequest):
             session_id=payload.sessionId,
             routing_mode=payload.routingMode,
             override_provider=payload.providerOverride,
-            override_model=payload.modelOverride
+            override_model=payload.modelOverride,
+            use_memory=use_memory,
         )
         return {
             "reply": result.reply,
             "toolEvents": result.tool_events,
-            "memory": memory_store.get_state(),
+            "memory": memory_store.get_state() if use_memory else None,
             "model": used_model,
         }
     except LLMClientError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
 @app.get("/api/weather")
-async def get_weather(location: Optional[str] = ""):
+async def get_weather(location: Optional[str] = "", use_memory: bool = True):
     try:
         data = weather_svc.fetch_weather(location)
-        memory_store.set_last_weather(data)
-        return {"weather": data, "memory": memory_store.get_state()}
+        if use_memory:
+            memory_store.set_last_weather(data)
+        return {"weather": data, "memory": memory_store.get_state() if use_memory else None}
     except WeatherError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 @app.get("/api/news")
-async def get_news(topic: Optional[str] = ""):
+async def get_news(topic: Optional[str] = "", use_memory: bool = True):
     try:
         data = news_svc.fetch_news(topic)
-        memory_store.set_last_news(data)
-        return {"news": data, "memory": memory_store.get_state()}
+        if use_memory:
+            memory_store.set_last_news(data)
+        return {"news": data, "memory": memory_store.get_state() if use_memory else None}
     except NewsError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 

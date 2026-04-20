@@ -1029,6 +1029,11 @@ a:hover {
   border-color: var(--accent-hover);
 }
 
+.small-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .small-btn.ghost {
   background: transparent;
   color: var(--accent);
@@ -1036,6 +1041,10 @@ a:hover {
 
 .small-btn.ghost:hover {
   background: var(--accent-soft);
+}
+
+.small-btn.ghost:disabled:hover {
+  background: transparent;
 }
 
 
@@ -1077,6 +1086,15 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.drawer-panel.memory-locked {
+  opacity: 0.62;
+}
+
+.drawer-panel.memory-locked .drawer-panel-title,
+.drawer-panel.memory-locked .drawer-hint {
+  color: var(--muted);
 }
 
 .drawer-form input,

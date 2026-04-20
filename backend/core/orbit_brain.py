@@ -308,9 +308,14 @@ def build_system_instruction(
     recent_conversation: list[dict[str, str]] | None = None,
     web_search_only: bool = False,
     offline_mode: bool = False,
+    use_memory: bool = True,
 ) -> str:
     normalized_mode = normalize_mode(mode)
-    memory_brief = json.dumps(memory_store.get_brief(), ensure_ascii=True)
+    memory_brief = (
+        json.dumps(memory_store.get_brief(), ensure_ascii=True)
+        if use_memory
+        else '"Memory access disabled by user preference."'
+    )
     now = datetime.now().astimezone().strftime("%A, %B %d, %Y at %H:%M %Z")
 
     if normalized_mode == "copilot":
@@ -343,15 +348,23 @@ def build_system_instruction(
         search_mode_note = (
             "\nSEARCH MODE: OFFLINE. The user has activated Offline Mode. "
             "The `search_web` tool is NOT available. Focus on using local knowledge "
-            "(`search_local_docs`), memory, and your built-in knowledge. "
+            f"(`search_local_docs`){', saved memory,' if use_memory else ''} and your built-in knowledge. "
             "Do NOT attempt to call `search_web`."
+        )
+
+    memory_mode_note = ""
+    if not use_memory:
+        memory_mode_note = (
+            "\nMEMORY ACCESS: DISABLED. The user did not grant access to saved MongoDB memory. "
+            "Do not claim to remember saved details, do not save new profile/tasks/notes, "
+            "and ignore any earlier instruction about accessing or writing long-term memory."
         )
 
     language_hint = LANGUAGE_HINTS.get(preferred_language, "")
     language_section = f"\nLanguage preference: {language_hint}" if language_hint else ""
     conversation_snapshot = _build_conversation_snapshot(recent_conversation)
     return (
-        f"{BASE_PROMPT}\n{mode_prompt}{search_mode_note}\nLocal date and time: {now}{language_section}\n"
+        f"{BASE_PROMPT}\n{mode_prompt}{search_mode_note}{memory_mode_note}\nLocal date and time: {now}{language_section}\n"
         f"Saved context snapshot: {memory_brief}\nRecent conversation snapshot: {conversation_snapshot}"
     )
 
@@ -363,6 +376,7 @@ def build_rest_tools(
     web_search_only: bool = False,
     offline_mode: bool = False,
     enable_session_docs: bool = False,
+    enable_memory: bool = True,
 ) -> list[dict[str, Any]]:
     """Build the function declarations list for the LLM.
 
@@ -375,12 +389,22 @@ def build_rest_tools(
     - ``enable_session_docs``: include ``search_session_docs`` when the
       current session has file attachments.
     """
+    memory_disabled_tools = {
+        "remember_note",
+        "update_profile",
+        "add_task",
+        "complete_task",
+        "delete_task",
+        "get_tasks",
+        "get_notes",
+    }
     funcs = [
         f for f in _FUNCTION_DECLARATIONS
         if not (
             (f["name"] == "search_local_docs" and not enable_knowledge)
             or (f["name"] == "search_web" and offline_mode)
             or (f["name"] == "search_session_docs" and not enable_session_docs)
+            or (f["name"] in memory_disabled_tools and not enable_memory)
         )
     ]
     return [{"functionDeclarations": funcs}]
@@ -397,6 +421,7 @@ def run_tool_call(
     arguments: dict[str, Any] | None = None,
     call_id: str | None = None,
     session_id: str | None = None,
+    allow_memory: bool = True,
 ) -> ToolRunResult:
     args = arguments or {}
     resolved_call_id = call_id or uuid.uuid4().hex[:8]
@@ -404,17 +429,23 @@ def run_tool_call(
     try:
         if name == "get_weather":
             result = weather_service.fetch_weather(args.get("location"))
-            memory_store.set_last_weather(result)
+            if allow_memory:
+                memory_store.set_last_weather(result)
             event = {"type": "weather", "label": f'Weather checked for {result["location"]}'}
         elif name == "get_latest_news":
             result = news_service.fetch_news(args.get("topic"), args.get("max_items", 5))
-            memory_store.set_last_news(result)
+            if allow_memory:
+                memory_store.set_last_news(result)
             event = {"type": "news", "label": f'News checked for {result["topic"]}'}
         elif name == "remember_note":
+            if not allow_memory:
+                raise ValueError("Agent Memory is disabled by user preference.")
             saved = memory_store.remember_note(args.get("note", ""), args.get("category", "note"))
             result = {"saved_note": saved}
             event = {"type": "memory", "label": f'Remembered: {saved["text"]}'}
         elif name == "update_profile":
+            if not allow_memory:
+                raise ValueError("Agent Memory is disabled by user preference.")
             updated = memory_store.update_profile(
                 display_name=args.get("display_name"),
                 location=args.get("location"),
@@ -423,6 +454,8 @@ def run_tool_call(
             result = {"profile_snapshot": updated["profile"]}
             event = {"type": "profile", "label": "Profile updated"}
         elif name == "add_task":
+            if not allow_memory:
+                raise ValueError("Agent Memory is disabled by user preference.")
             task = memory_store.add_task(
                 title=args.get("title", ""),
                 priority=args.get("priority", "medium"),
@@ -431,14 +464,20 @@ def run_tool_call(
             result = {"task": task}
             event = {"type": "task", "label": f'Task added: {task["title"]}'}
         elif name == "complete_task":
+            if not allow_memory:
+                raise ValueError("Agent Memory is disabled by user preference.")
             task = memory_store.complete_task(args.get("task_ref", ""))
             result = {"task": task}
             event = {"type": "task", "label": f'Task completed: {task["title"]}'}
         elif name == "delete_task":
+            if not allow_memory:
+                raise ValueError("Agent Memory is disabled by user preference.")
             task = memory_store.delete_task(args.get("task_ref", ""))
             result = {"task": task}
             event = {"type": "task", "label": f'Task deleted: {task["title"]}'}
         elif name == "get_tasks":
+            if not allow_memory:
+                raise ValueError("Agent Memory is disabled by user preference.")
             state = memory_store.get_state()
             all_tasks = state.get("tasks", [])
             status_filter = (args.get("status_filter") or "all").strip().lower()
@@ -451,6 +490,8 @@ def run_tool_call(
             result = {"tasks": filtered, "total_count": len(filtered)}
             event = {"type": "task", "label": f"Retrieved {len(filtered)} task(s)"}
         elif name == "get_notes":
+            if not allow_memory:
+                raise ValueError("Agent Memory is disabled by user preference.")
             state = memory_store.get_state()
             all_notes = state.get("profile", {}).get("notes", [])
             cat_filter = (args.get("category_filter") or "").strip().lower()

@@ -83,6 +83,8 @@ const appState = {
   preferredLanguage: window.localStorage.getItem("orbit_virtual_language") || "default",
   conversation: [],
   memory: null,
+  memoryEnabled: false,
+  memoryConsent: window.localStorage.getItem("orbit_memory_consent") || "",
   currentTurn: null,
   recentToolEvents: [],
   activeSessionId: null,
@@ -187,6 +189,10 @@ const elements = {
   noteTextInput: document.getElementById("noteTextInput"),
   noteCategoryInput: document.getElementById("noteCategoryInput"),
   fileAttachInput: document.getElementById("fileAttachInput"),
+  memoryConsentStatus: document.getElementById("memoryConsentStatus"),
+  enableMemoryBtn: document.getElementById("enableMemoryBtn"),
+  disableMemoryBtn: document.getElementById("disableMemoryBtn"),
+  memoryGatedPanels: Array.from(document.querySelectorAll("[data-memory-gated]")),
 
   chatSettingsBtn: document.getElementById("chatSettingsBtn"),
   chatSettingsDropdown: document.getElementById("chatSettingsDropdown"),
@@ -204,6 +210,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   restoreSidebarState();
   setStageState("idle", "Idle", "Orbit Virtual Assistant is running.");
   addMessage("system", "Orbit Virtual Assistant is ready. Type a message, hold Control to talk, or press Ctrl+M to record and review.");
+  await initializeMemoryConsent();
   await refreshState();
 });
 
@@ -296,6 +303,18 @@ function bindEvents() {
     elements.deleteChatBtn.addEventListener("click", async () => {
       closeAllDropdowns();
       await deleteChat(appState.activeSessionId, { useActiveFallback: true });
+    });
+  }
+
+  if (elements.enableMemoryBtn) {
+    elements.enableMemoryBtn.addEventListener("click", async () => {
+      await setMemoryConsent(true, { announce: true });
+    });
+  }
+
+  if (elements.disableMemoryBtn) {
+    elements.disableMemoryBtn.addEventListener("click", async () => {
+      await setMemoryConsent(false, { announce: true });
     });
   }
 
@@ -704,12 +723,108 @@ function ensureVoiceTurn() { if (!appState.currentTurn || appState.currentTurn.s
 function ensureVoiceDraft() { if (!appState.currentTurn.userNode) appState.currentTurn.userNode = addMessage("user", "Listening...", "Voice transcript"); }
 function setVoiceStatus(text) { elements.voiceStatus.textContent = text; elements.composerVoiceStatus.textContent = text; }
 
+function getStoredMemoryConsent() {
+  if (appState.memoryConsent === "accepted") return true;
+  if (appState.memoryConsent === "declined") return false;
+  return null;
+}
+
+function updateMemoryActionButton(button) {
+  if (!button) return;
+  button.disabled = !appState.memoryEnabled;
+  button.title = appState.memoryEnabled ? "Save to Notes" : "Enable Agent Memory to save notes";
+}
+
+function syncMessageActionButtons() {
+  document.querySelectorAll(".message-action-btn").forEach((button) => updateMemoryActionButton(button));
+}
+
+function clearMemoryStateViews() {
+  appState.memory = null;
+  elements.displayNameInput.value = "";
+  elements.locationInput.value = "";
+  elements.routineInput.value = "";
+  elements.taskList.innerHTML = '<p class="muted">Enable Agent Memory to use saved tasks.</p>';
+  elements.notesList.innerHTML = '<p class="muted">Enable Agent Memory to use saved notes.</p>';
+  elements.memoryHint.textContent = "Agent Memory is off. Orbit will not access saved MongoDB memories.";
+}
+
+function applyMemoryConsentUI() {
+  if (elements.memoryConsentStatus) {
+    elements.memoryConsentStatus.textContent = appState.memoryEnabled
+      ? "Agent Memory is enabled. Orbit can read and save profile, tasks, notes, and long-term context in MongoDB."
+      : "Agent Memory is off. Orbit will not access saved MongoDB memories or write new ones. Weather and news can still be used without being remembered.";
+  }
+
+  if (elements.enableMemoryBtn) elements.enableMemoryBtn.disabled = appState.memoryEnabled;
+  if (elements.disableMemoryBtn) elements.disableMemoryBtn.disabled = !appState.memoryEnabled;
+
+  elements.memoryGatedPanels.forEach((panel) => {
+    panel.classList.toggle("memory-locked", !appState.memoryEnabled);
+    panel.querySelectorAll("input, button, select, textarea").forEach((control) => {
+      control.disabled = !appState.memoryEnabled;
+    });
+  });
+
+  if (!appState.memoryEnabled) {
+    clearMemoryStateViews();
+  }
+
+  syncMessageActionButtons();
+}
+
+async function initializeMemoryConsent() {
+  const storedConsent = getStoredMemoryConsent();
+  if (storedConsent === null) {
+    const accepted = window.confirm(
+      "Allow Orbit to use Agent Memory (MongoDB) to read and save your profile, tasks, notes, and long-term assistant memory?"
+    );
+    appState.memoryConsent = accepted ? "accepted" : "declined";
+    window.localStorage.setItem("orbit_memory_consent", appState.memoryConsent);
+    appState.memoryEnabled = accepted;
+  } else {
+    appState.memoryEnabled = storedConsent;
+  }
+
+  applyMemoryConsentUI();
+}
+
+async function setMemoryConsent(enabled, { announce = false } = {}) {
+  appState.memoryEnabled = enabled;
+  appState.memoryConsent = enabled ? "accepted" : "declined";
+  window.localStorage.setItem("orbit_memory_consent", appState.memoryConsent);
+  applyMemoryConsentUI();
+
+  if (enabled) {
+    await refreshState();
+  } else {
+    clearMemoryStateViews();
+    renderSessions(appState.sessions);
+    updateSessionActionButtons();
+  }
+
+  if (announce) {
+    addMessage(
+      "system",
+      enabled
+        ? "Agent Memory enabled. Orbit can access saved MongoDB memories again."
+        : "Agent Memory disabled. Orbit will keep working without saved memory access."
+    );
+  }
+}
+
+function ensureMemoryEnabled() {
+  if (appState.memoryEnabled) return true;
+  addMessage("system", "Agent Memory is disabled. Enable it in Tools & Settings to use saved profile, tasks, or notes.");
+  return false;
+}
+
 // ---------- API Communication ----------
 
 async function refreshState() {
-  const response = await fetch("/api/state");
+  const response = await fetch(`/api/state?include_memory=${appState.memoryEnabled ? "true" : "false"}`);
   const data = await response.json();
-  appState.memory = data.memory;
+  appState.memory = data.memory || null;
 
   if (elements.routingToggle) {
     if (data.enableHybrid) {
@@ -727,13 +842,16 @@ async function refreshState() {
   elements.modelBadge.textContent = data.model ? `${data.model}` : "Model not set";
   elements.runtimeBadge.textContent = "Browser Engine";
 
-  elements.displayNameInput.value = data.memory.profile.display_name || "";
-  elements.locationInput.value = data.memory.profile.location || data.defaultLocation || "";
-  elements.routineInput.value = data.memory.profile.routine || "";
+  if (appState.memoryEnabled && data.memory) {
+    elements.displayNameInput.value = data.memory.profile.display_name || "";
+    elements.locationInput.value = data.memory.profile.location || data.defaultLocation || "";
+    elements.routineInput.value = data.memory.profile.routine || "";
+  }
 
   refreshMemoryViews();
   appState.sessions = data.sessions || [];
   renderSessions(appState.sessions);
+  updateSessionActionButtons();
 }
 
 // ==========================================
@@ -854,13 +972,14 @@ async function sendPrompt(prompt, options = {}) {
         offlineMode: appState.offlineModeActive,
         sessionId: appState.activeSessionId || "",
         routingMode: appState.routingActive ? "dynamic" : "fixed",
+        useMemory: appState.memoryEnabled,
       }),
     });
 
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || data.detail || "Chat request failed.");
 
-    appState.memory = data.memory;
+    appState.memory = data.memory || null;
     turn.outputText = data.reply;
 
     if (data.toolEvents && data.toolEvents.length > 0) {
@@ -974,6 +1093,7 @@ function addMessage(role, text, meta = "", timestamp = null) {
     noteBtn.title = "Save to Notes";
     noteBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span>Add to Notes</span>';
     noteBtn.addEventListener("click", () => saveMessageAsNote(body, message));
+    updateMemoryActionButton(noteBtn);
     actions.appendChild(noteBtn);
 
     message.appendChild(actions);
@@ -1335,6 +1455,10 @@ function updateSessionActionButtons() {
 // ---------- Memory & Data Views ----------
 
 function refreshMemoryViews() {
+  if (!appState.memoryEnabled) {
+    clearMemoryStateViews();
+    return;
+  }
   if (!appState.memory) return;
   renderWeather(appState.memory.last_weather);
   renderNews(appState.memory.last_news);
@@ -1422,6 +1546,7 @@ function renderNotes(notes) {
 
 async function saveProfile(event) {
   event.preventDefault();
+  if (!ensureMemoryEnabled()) return;
   const response = await fetch("/api/profile", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -1432,33 +1557,46 @@ async function saveProfile(event) {
   });
   const data = await response.json();
   if (!response.ok) { addMessage("system", data.error || "Could not save your profile."); return; }
-  appState.memory = data.memory;
+  appState.memory = data.memory || null;
   refreshMemoryViews();
 }
 
 async function refreshWeather() {
   const location = elements.locationInput.value.trim();
-  const query = location ? `?location=${encodeURIComponent(location)}` : "";
-  const response = await fetch(`/api/weather${query}`);
+  const params = new URLSearchParams();
+  if (location) params.set("location", location);
+  params.set("use_memory", appState.memoryEnabled ? "true" : "false");
+  const response = await fetch(`/api/weather?${params.toString()}`);
   const data = await response.json();
   if (!response.ok) { addMessage("system", data.error || "Could not refresh the weather."); return; }
-  appState.memory = data.memory;
-  refreshMemoryViews();
+  if (appState.memoryEnabled) {
+    appState.memory = data.memory || null;
+    refreshMemoryViews();
+  } else {
+    renderWeather(data.weather);
+  }
 }
 
 async function refreshNews() {
   const location = elements.locationInput.value.trim();
   const topic = location ? `${location} headlines` : "top headlines";
-  const query = `?topic=${encodeURIComponent(topic)}`;
-  const response = await fetch(`/api/news${query}`);
+  const params = new URLSearchParams();
+  params.set("topic", topic);
+  params.set("use_memory", appState.memoryEnabled ? "true" : "false");
+  const response = await fetch(`/api/news?${params.toString()}`);
   const data = await response.json();
   if (!response.ok) { addMessage("system", data.error || "Could not refresh the news."); return; }
-  appState.memory = data.memory;
-  refreshMemoryViews();
+  if (appState.memoryEnabled) {
+    appState.memory = data.memory || null;
+    refreshMemoryViews();
+  } else {
+    renderNews(data.news);
+  }
 }
 
 async function addTask(event) {
   event.preventDefault();
+  if (!ensureMemoryEnabled()) return;
   const response = await fetch("/api/tasks", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -1471,34 +1609,37 @@ async function addTask(event) {
   if (!response.ok) return;
   elements.taskTitleInput.value = "";
   elements.taskDueDateInput.value = "";
-  appState.memory = data.memory;
+  appState.memory = data.memory || null;
   refreshMemoryViews();
 }
 
 async function completeTask(taskRef) {
+  if (!ensureMemoryEnabled()) return;
   const response = await fetch("/api/tasks/complete", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ taskRef }),
   });
   const data = await response.json();
   if (!response.ok) return;
-  appState.memory = data.memory;
+  appState.memory = data.memory || null;
   refreshMemoryViews();
 }
 
 async function deleteNote(noteId) {
   if (!noteId) return;
+  if (!ensureMemoryEnabled()) return;
   try {
     const response = await fetch(`/api/notes/${noteId}`, { method: "DELETE" });
     if (!response.ok) return;
     const data = await response.json();
-    appState.memory = data.memory;
+    appState.memory = data.memory || null;
     refreshMemoryViews();
   } catch (err) {}
 }
 
 async function addNoteManual(event) {
   event.preventDefault();
+  if (!ensureMemoryEnabled()) return;
   const text = elements.noteTextInput.value.trim();
   const category = elements.noteCategoryInput.value.trim() || "note";
   if (!text) return;
@@ -1511,12 +1652,13 @@ async function addNoteManual(event) {
     const data = await response.json();
     elements.noteTextInput.value = "";
     elements.noteCategoryInput.value = "";
-    appState.memory = data.memory;
+    appState.memory = data.memory || null;
     refreshMemoryViews();
   } catch (err) {}
 }
 
 async function saveMessageAsNote(bodyEl, messageEl) {
+  if (!ensureMemoryEnabled()) return;
   const selection = window.getSelection();
   let noteText = "";
   if (selection && selection.toString().trim() && messageEl.contains(selection.anchorNode)) {
@@ -1531,7 +1673,7 @@ async function saveMessageAsNote(bodyEl, messageEl) {
     });
     if (!response.ok) return;
     const data = await response.json();
-    appState.memory = data.memory;
+    appState.memory = data.memory || null;
     refreshMemoryViews();
     const btn = messageEl.querySelector(".message-action-btn");
     if (btn) {
