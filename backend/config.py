@@ -36,6 +36,11 @@ class Settings:
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_db: str = "orbit_assistant"
 
+    # NEW FIELDS FOR HYBRID MODE
+    enable_hybrid: bool = False
+    hybrid_provider: str = "openrouter"
+    hybrid_model: str = "openai/gpt-4o"
+
     @property
     def provider_name(self) -> str:
         names = {
@@ -74,4 +79,8 @@ def get_settings() -> Settings:
         mongodb_uri=os.getenv("MONGODB_URI", "mongodb://localhost:27017").strip(),
         mongodb_db=os.getenv("MONGODB_DB", "orbit_assistant").strip(),
         embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-bge-m3").strip(),
+
+        # READ HYBRID SETTINGS FROM .ENV
+        hybrid_provider=os.getenv("HYBRID_PROVIDER", "openrouter").strip().lower(),
+        hybrid_model=os.getenv("HYBRID_MODEL", "openai/gpt-4o").strip(),
     )

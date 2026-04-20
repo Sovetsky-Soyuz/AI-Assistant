@@ -13,6 +13,14 @@
 - [assistant_memory.json.bak](file://data/assistant_memory.json.bak)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Enhanced memory management with new collections for knowledge chunks, session attachments, and session chunks
+- Improved cleanup procedures with cascading deletion for attachments and chunks
+- Better resource management with separate collections for different data types
+- Updated MongoDB schema with new collection definitions and indexing strategies
+- Enhanced session management with attachment and chunk handling capabilities
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -27,6 +35,8 @@
 
 ## Introduction
 This document explains the memory management and persistence layer of the Orbit Virtual Assistant. It covers the MongoDB integration, data schemas, migration from legacy JSON storage, session/message management, user profiles, tasks, notes, caching, knowledge indexing, and the synchronization model between the backend and the frontend. It also details query patterns, indexing strategies, performance optimization, and operational considerations such as data integrity and backups.
+
+**Updated** Enhanced with new collections for knowledge chunks, session attachments, and session chunks, providing better resource management and improved cleanup procedures.
 
 ## Project Structure
 The persistence layer spans three primary areas:
@@ -94,10 +104,12 @@ Mongo --> SC
 - [config.py:20-76](file://backend/config.py#L20-L76)
 
 ## Core Components
-- MemoryStore: MongoDB-backed persistence layer with backward-compatible APIs mirroring the old JSON interface. Provides CRUD and aggregation helpers for sessions, messages, notes, tasks, profile, cache, knowledge chunks, and attachments/chunks.
+- MemoryStore: MongoDB-backed persistence layer with backward-compatible APIs mirroring the old JSON interface. Provides CRUD and aggregation helpers for sessions, messages, notes, tasks, profile, cache, knowledge chunks, session attachments, and session chunks.
 - AssistantApplication: HTTP server that initializes MemoryStore, exposes REST endpoints, and orchestrates LLM interactions and tool calls.
 - KnowledgeService: Manages persistent knowledge base indexing and session-scoped document search using BM25 and optional FAISS hybrid retrieval.
 - Frontend app.js: Implements real-time state synchronization, session/message CRUD, and tool-triggered persistence.
+
+**Updated** Enhanced with new methods for managing session attachments and chunks, providing better resource isolation and cleanup capabilities.
 
 **Section sources**
 - [memory_store.py:67-947](file://backend/core/memory_store.py#L67-L947)
@@ -139,6 +151,8 @@ FE-->>Browser : Update UI and state
 
 ### MongoDB Integration and Schemas
 MemoryStore encapsulates collections for sessions, messages, profile, notes, tasks, activity, cache, knowledge_chunks, session_attachments, and session_chunks. It enforces unique indexes and composite indexes for efficient queries.
+
+**Updated** Added new collections for knowledge chunks, session attachments, and session chunks to improve resource management and provide better isolation between different types of data.
 
 ```mermaid
 erDiagram
@@ -235,6 +249,8 @@ SESSION_ATTACHMENTS ||--o{ SESSION_CHUNKS : "chunks"
 - Messages: Per-session insertion, retrieval with optional limits, and deletion by message_id.
 - History bridge: Backward-compatible update_history/get_history for legacy clients.
 
+**Updated** Enhanced session deletion now includes cascading cleanup of attachments and chunks to prevent orphaned data.
+
 ```mermaid
 sequenceDiagram
 participant FE as "app.js"
@@ -302,6 +318,8 @@ Error --> Done
 - Persistent knowledge base: file hash tracking, replace-on-change semantics, and MongoDB-backed chunk storage.
 - Session-scoped documents: attachment registration and chunk indexing for targeted retrieval.
 
+**Updated** Enhanced with separate collections for knowledge chunks and session chunks to improve performance and resource management.
+
 ```mermaid
 sequenceDiagram
 participant FE as "app.js"
@@ -327,6 +345,20 @@ API-->>FE : {attachment, chunk_count}
 - [knowledge.py:145-230](file://backend/tools/knowledge.py#L145-L230)
 - [knowledge.py:303-335](file://backend/tools/knowledge.py#L303-L335)
 - [memory_store.py:802-830](file://backend/core/memory_store.py#L802-L830)
+
+### Enhanced Resource Management and Cleanup Procedures
+**New** The system now provides improved resource management with dedicated collections for different data types and cascading cleanup procedures.
+
+- Knowledge chunks: Separate collection for persistent knowledge base chunks with file hash tracking and replace-on-change semantics.
+- Session attachments: Dedicated collection for file attachments with metadata and storage paths.
+- Session chunks: Separate collection for parsed text chunks from session attachments.
+- Cascading cleanup: When sessions, attachments, or chunks are deleted, associated data is automatically cleaned up to prevent orphaned records.
+
+**Section sources**
+- [memory_store.py:694-748](file://backend/core/memory_store.py#L694-L748)
+- [memory_store.py:754-796](file://backend/core/memory_store.py#L754-L796)
+- [memory_store.py:802-830](file://backend/core/memory_store.py#L802-L830)
+- [server.py:220-247](file://backend/server.py#L220-L247)
 
 ### Migration from Legacy JSON Storage
 - One-time migration reads assistant_memory.json and optional chat_history.json, importing into MongoDB collections.
@@ -424,6 +456,8 @@ KB --> Mongo
   - Unique indexes on IDs for fast upserts and lookups.
   - Composite indexes for frequent sorts and filters (e.g., sessions pinned + updated_at, messages session + created_at).
   - Knowledge chunks indexed by source_file and file_hash for change detection and selective rebuilds.
+  - Session attachments indexed by session_id for efficient retrieval.
+  - Session chunks indexed by session_id and attachment_id for organized document search.
 - Aggregation:
   - Knowledge file hash grouping to detect changed files.
   - Activity trimming to a fixed-size capped tail.
@@ -434,6 +468,11 @@ KB --> Mongo
 - Retrieval:
   - Limit message lists with optional limits to reduce payload sizes.
   - Lazy session retriever cache invalidation on attachment deletions.
+- Resource Management:
+  - Separate collections for different data types improve query performance and reduce contention.
+  - Cascading cleanup prevents orphaned data and reduces storage overhead.
+
+**Updated** Enhanced indexing strategies for new collections and improved resource management through dedicated data segregation.
 
 [No sources needed since this section provides general guidance]
 
@@ -448,6 +487,14 @@ KB --> Mongo
   - Activity records are trimmed to a fixed maximum; older entries are pruned automatically.
 - Migration issues:
   - If legacy JSON exists, migration runs once and renames files to .json.bak; subsequent runs skip migration.
+- Attachment issues:
+  - File uploads are validated for supported extensions and size limits.
+  - Chunk parsing errors are handled gracefully with informative error messages.
+- Resource cleanup:
+  - Session deletion automatically cleans up associated attachments and chunks.
+  - Knowledge base cleanup removes orphaned chunks when files are deleted.
+
+**Updated** Added troubleshooting guidance for new attachment and chunk functionality.
 
 **Section sources**
 - [memory_store.py:86-98](file://backend/core/memory_store.py#L86-L98)
@@ -455,9 +502,12 @@ KB --> Mongo
 - [memory_store.py:377-396](file://backend/core/memory_store.py#L377-L396)
 - [memory_store.py:162-183](file://backend/core/memory_store.py#L162-L183)
 - [server.py:31-43](file://backend/server.py#L31-L43)
+- [server.py:220-247](file://backend/server.py#L220-L247)
 
 ## Conclusion
-The memory management and persistence layer cleanly abstracts MongoDB behind a backward-compatible interface, enabling seamless migration from JSON to MongoDB. It provides robust indexing, concurrency control, and clear separation between global memory (profile, tasks, notes, cache) and session-scoped data (messages, attachments, chunks). The frontend synchronizes state via REST endpoints, ensuring a responsive and coherent user experience.
+The memory management and persistence layer cleanly abstracts MongoDB behind a backward-compatible interface, enabling seamless migration from JSON to MongoDB. It provides robust indexing, concurrency control, and clear separation between global memory (profile, tasks, notes, cache) and session-scoped data (messages, attachments, chunks). The enhanced resource management with dedicated collections for knowledge chunks, session attachments, and session chunks improves performance and provides better cleanup procedures. The frontend synchronizes state via REST endpoints, ensuring a responsive and coherent user experience.
+
+**Updated** Enhanced with improved resource management and cleanup procedures for better data integrity and performance.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -471,21 +521,38 @@ The memory management and persistence layer cleanly abstracts MongoDB behind a b
 - Search knowledge base:
   - Use KnowledgeService.search(query) for persistent knowledge base.
   - Use KnowledgeService.search_session(session_id, query) for session-scoped documents.
+- Manage session attachments:
+  - Use add_session_attachment() to register file attachments.
+  - Use get_session_attachments() to retrieve attachment metadata.
+  - Use delete_session_attachment() to remove attachments and associated chunks.
+- Manage knowledge chunks:
+  - Use store_knowledge_chunks() to index new knowledge files.
+  - Use get_knowledge_file_hashes() to detect file changes.
+  - Use get_all_knowledge_chunks() to rebuild retrievers.
+
+**Updated** Added new query patterns for attachment and chunk management.
 
 **Section sources**
 - [memory_store.py:188-250](file://backend/core/memory_store.py#L188-L250)
 - [memory_store.py:675-685](file://backend/core/memory_store.py#L675-L685)
 - [knowledge.py:270-298](file://backend/tools/knowledge.py#L270-L298)
 - [knowledge.py:337-355](file://backend/tools/knowledge.py#L337-L355)
+- [memory_store.py:754-796](file://backend/core/memory_store.py#L754-L796)
+- [memory_store.py:802-830](file://backend/core/memory_store.py#L802-L830)
 
 ### Data Integrity and Backup
 - Integrity:
   - Unique indexes on IDs prevent duplicates.
   - Upserts preserve existing data when migrating.
   - Activity logs provide audit trails for profile, task, note, and media events.
+  - Cascading cleanup ensures referential integrity between related collections.
 - Backup:
   - Back up MongoDB collections regularly.
   - Preserve assistant_memory.json.bak post-migration for rollback verification.
+  - Knowledge base chunks can be rebuilt from source files if needed.
+  - Session attachments and chunks are automatically cleaned up during cascading operations.
+
+**Updated** Enhanced backup and integrity guidance for new collections.
 
 **Section sources**
 - [memory_store.py:119-135](file://backend/core/memory_store.py#L119-L135)

@@ -6,7 +6,17 @@
 - [memory_store.py](file://backend/core/memory_store.py)
 - [app.js](file://frontend/scripts/app.js)
 - [config.py](file://backend/config.py)
+- [knowledge.py](file://backend/tools/knowledge.py)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Updated session management endpoints documentation to reflect actual implementation
+- Added comprehensive coverage of attachment upload, listing, and deletion endpoints
+- Enhanced validation rules and error handling documentation
+- Updated request/response schemas with actual implementation details
+- Added proper file type restrictions and size limits
+- Updated frontend integration patterns with actual attachment handling
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -268,7 +278,7 @@ Attachments are scoped to sessions and stored in the session_attachments collect
     - filename (string): Original file name.
     - data (string): Base64-encoded file content.
   - Response:
-    - Body: { ok: true, attachment: { attachment_id, session_id, filename, file_type, file_size, storage_path, created_at } }
+    - Body: { ok: true, attachment: { attachment_id, session_id, filename, file_type, file_size, storage_path, created_at, chunk_count? } }
   - Validation and errors:
     - 400 Bad Request for missing filename/data, unsupported file type, invalid base64, or file too large.
   - Behavior:
@@ -289,6 +299,7 @@ Attachments are scoped to sessions and stored in the session_attachments collect
 **Section sources**
 - [server.py](file://backend/server.py)
 - [memory_store.py](file://backend/core/memory_store.py)
+- [knowledge.py](file://backend/tools/knowledge.py)
 
 ### Workflow Sequences
 
@@ -362,6 +373,27 @@ Note over API,MS : Disk cleanup for attachments is performed by caller
 **Diagram sources**
 - [server.py](file://backend/server.py)
 - [memory_store.py](file://backend/core/memory_store.py)
+
+#### Uploading Session Attachments
+```mermaid
+sequenceDiagram
+participant FE as "Frontend"
+participant API as "HTTP Server"
+participant MS as "MemoryStore"
+participant K as "KnowledgeService"
+FE->>API : POST /api/sessions/{id}/attachments { filename, data }
+API->>API : base64 decode
+API->>MS : add_session_attachment
+MS-->>API : attachment record
+API->>K : index_session_file
+K-->>API : chunk_count
+API-->>FE : { ok : true, attachment }
+```
+
+**Diagram sources**
+- [server.py](file://backend/server.py)
+- [memory_store.py](file://backend/core/memory_store.py)
+- [knowledge.py](file://backend/tools/knowledge.py)
 
 ### Filtering, Pagination, and Sorting
 - Filtering:
@@ -546,8 +578,6 @@ MS --> DB["MongoDB"]
 - Sorting: Server-side sorting ensures consistent ordering without client-side manipulation.
 - Cascading deletes: Deleting a session removes associated messages, attachments, and chunks efficiently in bulk.
 - Attachment processing: Parsing and indexing attachments occur asynchronously; failures are recorded without blocking the API response.
-
-[No sources needed since this section provides general guidance]
 
 ## Troubleshooting Guide
 Common issues and resolutions:

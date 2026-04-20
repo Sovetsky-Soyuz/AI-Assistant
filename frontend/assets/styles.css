@@ -1407,14 +1407,14 @@ a:hover {
   font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
 }
 
-.message.assistant .message-body pre {
+/* .message.assistant .message-body pre {
   margin: 8px 0;
   padding: 14px;
   border-radius: 8px;
   background: #1e1e1e;
   color: #d4d4d4;
   overflow-x: auto;
-}
+} */
 
 .message.assistant .message-body pre code {
   padding: 0;
@@ -1433,6 +1433,50 @@ a:hover {
 
 .message.assistant .message-body a {
   color: var(--accent);
+}
+
+/* ---------- Code Block & Copy Button ---------- */
+.code-block-wrapper {
+  position: relative;
+  margin: 8px 0;
+}
+
+.code-block-wrapper pre {
+  margin: 0;
+  padding-top: 36px; /* Make space for the copy button */
+  border-radius: 8px;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  overflow-x: auto;
+}
+
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #d4d4d4;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all var(--transition);
+  z-index: 10;
+}
+
+.copy-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.copy-btn.copied {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
 }
 
 
@@ -1506,4 +1550,21 @@ a:hover {
     max-width: 92%;
     padding: 10px 14px;
   }
+}
+
+/* ---------- 19. Streaming Cursor ---------- */
+.streaming-cursor {
+  display: inline-block;
+  width: 6px;
+  height: 15px;
+  background-color: var(--accent);
+  vertical-align: middle;
+  margin-left: 3px;
+  border-radius: 2px;
+  animation: cursorBlink 0.8s step-end infinite;
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }

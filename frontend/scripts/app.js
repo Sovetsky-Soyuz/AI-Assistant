@@ -30,6 +30,35 @@ function createEmptyTurn(source = "text") {
   };
 }
 
+// ---------- Markdown Configuration ----------
+if (typeof marked !== "undefined") {
+  const renderer = new marked.Renderer();
+  
+  // Override code block rendering to inject a Copy button
+  renderer.code = function(tokenOrCode, language) {
+    const codeText = typeof tokenOrCode === 'string' ? tokenOrCode : (tokenOrCode.text || "");
+    const lang = typeof tokenOrCode === 'string' ? language : (tokenOrCode.lang || "");
+    
+    const validLang = lang ? `language-${lang}` : '';
+    const escapedCode = codeText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
+    return `
+      <div class="code-block-wrapper">
+        <button class="copy-btn" title="Copy code">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span>Copy</span>
+        </button>
+        <pre><code class="${validLang}">${escapedCode}</code></pre>
+      </div>
+    `;
+  };
+  
+  marked.use({ renderer });
+}
+
 // ---------- Application State ----------
 
 const appState = {
@@ -82,6 +111,7 @@ const appState = {
   thinkingActive: false,
   imageGenActive: false,
   offlineModeActive: false,
+  routingActive: false,
 };
 
 // ---------- DOM Element References ----------
@@ -150,6 +180,7 @@ const elements = {
   thinkingToggle: document.getElementById("thinkingToggle"),
   webSearchToggle: document.getElementById("webSearchToggle"),
   offlineToggle: document.getElementById("offlineToggle"),
+  routingToggle: document.getElementById("routingToggle"),
 
   // Mic
   micButton: document.getElementById("micButton"),
@@ -376,6 +407,7 @@ function bindEvents() {
 
   setupToggleChip(elements.createImageBtn, "imageGenActive");
   setupToggleChip(elements.thinkingToggle, "thinkingActive");
+  setupToggleChip(elements.routingToggle, "routingActive");
 
   // Search and Offline toggles are mutually exclusive
   elements.webSearchToggle.addEventListener("click", () => {
@@ -487,6 +519,35 @@ function bindEvents() {
       }
     }
   });
+
+  // Handle copy button clicks via event delegation
+  elements.messageList.addEventListener("click", async (event) => {
+    const btn = event.target.closest(".copy-btn");
+    if (!btn) return;
+    
+    // Find the adjacent code block
+    const wrapper = btn.closest(".code-block-wrapper");
+    const codeBlock = wrapper.querySelector("code");
+    
+    if (codeBlock) {
+      try {
+        await navigator.clipboard.writeText(codeBlock.textContent);
+        
+        // Visual feedback
+        const span = btn.querySelector("span");
+        span.textContent = "Copied!";
+        btn.classList.add("copied");
+        
+        setTimeout(() => {
+          span.textContent = "Copy";
+          btn.classList.remove("copied");
+        }, 2000);
+      } catch (err) {
+        console.error("Failed to copy code:", err);
+      }
+    }
+  });
+
 }
 
 // ---------- UI Panel Controls ----------
@@ -905,6 +966,16 @@ async function refreshState() {
 
   appState.memory = data.memory;
 
+  // Hide or show the Smart Routing button based on CLI configuration
+  if (elements.routingToggle) {
+    if (data.enableHybrid) {
+      elements.routingToggle.style.display = "inline-flex";
+    } else {
+      elements.routingToggle.style.display = "none";
+      appState.routingActive = false; // Make sure to always turn it off if the CLI doesn't allow it.
+    }
+  }
+
   if (data.history && data.history.length > 0) {
     appState.conversation = data.history;
   }
@@ -966,11 +1037,14 @@ async function sendPrompt(prompt, options = {}) {
       const sessionRes = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: prompt.substring(0, 40) + (prompt.length > 40 ? "..." : "") }),
+        body: JSON.stringify({ 
+          firstMessage: prompt 
+        }),
       });
       const sessionData = await sessionRes.json();
       if (sessionRes.ok && sessionData.session) {
         appState.activeSessionId = sessionData.session.session_id;
+        await refreshSessions(); 
       }
     }
   } catch (err) {
@@ -1005,6 +1079,7 @@ async function sendPrompt(prompt, options = {}) {
         imageGen: appState.imageGenActive,
         offlineMode: appState.offlineModeActive,
         sessionId: appState.activeSessionId || "",
+        routingMode: appState.routingActive ? "dynamic" : "fixed",
       }),
     });
 
@@ -1022,12 +1097,17 @@ async function sendPrompt(prompt, options = {}) {
 
     turn.outputText = data.reply;
 
-    if (typeof marked !== "undefined") {
-      turn.assistantNode.querySelector(".message-body").innerHTML = marked.parse(data.reply);
-      formatLinks(turn.assistantNode.querySelector(".message-body"));
-    } else {
-      turn.assistantNode.querySelector(".message-body").textContent = data.reply;
-    }
+    // if (typeof marked !== "undefined") {
+    //   turn.assistantNode.querySelector(".message-body").innerHTML = marked.parse(data.reply);
+    //   formatLinks(turn.assistantNode.querySelector(".message-body"));
+    // } else {
+    //   turn.assistantNode.querySelector(".message-body").textContent = data.reply;
+    // }
+
+    turn.outputText = data.reply;
+    const bodyElement = turn.assistantNode.querySelector(".message-body");
+
+    await streamMarkdown(bodyElement, data.reply);
 
     const isRefusal = data.reply.includes("safety and moderation guidelines");
     if (isRefusal) {
@@ -1761,4 +1841,46 @@ function formatLinks(container) {
     link.setAttribute("target", "_blank");
     link.setAttribute("rel", "noopener noreferrer");
   });
+}
+
+// ---------- Streaming Text Effect ----------
+async function streamMarkdown(container, text, speed = 15) {
+  const html = typeof marked !== "undefined" ? marked.parse(text) : text;
+  container.innerHTML = "";
+  
+  const tokens = html.split(/(<[^>]+>)/g);
+  let currentHTML = "";
+
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token.startsWith("<")) {
+      currentHTML += token;
+      container.innerHTML = currentHTML;
+    } else {
+      const words = token.split(/(\s+)/);
+      for (let j = 0; j < words.length; j++) {
+        currentHTML += words[j];
+        container.innerHTML = currentHTML + '<span class="streaming-cursor"></span>';
+        elements.messageList.scrollTop = elements.messageList.scrollHeight;
+        await new Promise((r) => setTimeout(r, speed));
+      }
+    }
+  }
+  
+  container.innerHTML = currentHTML;
+  formatLinks(container);
+
+  // --- NEW: Render Math/LaTeX ---
+  if (typeof renderMathInElement === "function") {
+    renderMathInElement(container, {
+      delimiters: [
+        {left: "$$", right: "$$", display: true},
+        {left: "\\[", right: "\\]", display: true},
+        {left: "$", right: "$", display: false},
+        {left: "\\(", right: "\\)", display: false}
+      ],
+      throwOnError: false,
+      output: "html" // renders cleanly without relying on MathML fonts
+    });
+  }
 }

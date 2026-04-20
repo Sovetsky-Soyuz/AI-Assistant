@@ -9,7 +9,16 @@
 - [config.py](file://backend/config.py)
 - [requirements.txt](file://requirements.txt)
 - [README.md](file://README.md)
+- [run.py](file://run.py)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Enhanced session-scoped document search capabilities with lazy retriever caching
+- Improved retriever management with thread-safe operations and automatic fallback
+- Better integration with attachment system for per-chat document processing
+- Added hybrid retriever architecture for both persistent and session-scoped searches
+- Enhanced error handling and graceful fallback mechanisms
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -26,7 +35,7 @@
 ## Introduction
 This document explains the Knowledge Service component responsible for Retrieval-Augmented Generation (RAG) in the assistant. It covers:
 - Document parsing, chunking, and indexing for a persistent knowledge base
-- Session-scoped document search for files attached during chat
+- Session-scoped document search for files attached during chat with lazy retriever caching
 - Hybrid retriever architecture combining BM25 and FAISS with automatic fallback
 - File hash-based change detection and MongoDB-backed chunk storage
 - Thread-safe operations and LM Studio embedding integration
@@ -58,18 +67,18 @@ BK --> MS
 ```
 
 **Diagram sources**
-- [knowledge.py:88-393](file://backend/tools/knowledge.py#L88-L393)
+- [knowledge.py:88-394](file://backend/tools/knowledge.py#L88-L394)
 - [memory_store.py:67-947](file://backend/core/memory_store.py#L67-L947)
-- [server.py:23-611](file://backend/server.py#L23-L611)
+- [server.py:23-329](file://backend/server.py#L23-L329)
 - [build_knowledge.py:61-437](file://build_knowledge.py#L61-L437)
-- [config.py:20-76](file://backend/config.py#L20-L76)
+- [config.py:20-87](file://backend/config.py#L20-L87)
 
 **Section sources**
-- [README.md:164-201](file://README.md#L164-L201)
+- [README.md:164-218](file://README.md#L164-L218)
 - [requirements.txt:19-29](file://requirements.txt#L19-L29)
 
 ## Core Components
-- KnowledgeService: Orchestrates persistent knowledge base initialization, hybrid retriever construction, and both persistent and session-scoped searches
+- KnowledgeService: Orchestrates persistent knowledge base initialization, hybrid retriever construction, and both persistent and session-scoped searches with lazy retriever caching
 - MemoryStore: Provides thread-safe MongoDB access for storing and retrieving knowledge chunks and session chunks
 - KnowledgeBuilder: Standalone CLI to scan, diff, index, and verify the persistent knowledge base
 - Server integration: Exposes endpoints for uploading attachments and invoking KnowledgeService search
@@ -80,17 +89,18 @@ Key responsibilities:
 - Building BM25-only or hybrid BM25+FAISS retrievers with EnsembleRetriever
 - Storing chunks in MongoDB with metadata and thread-safe access
 - Managing session-scoped retrievers with lazy initialization and cache invalidation
+- Thread-safe operations using locks for concurrent access protection
 
 **Section sources**
-- [knowledge.py:88-393](file://backend/tools/knowledge.py#L88-L393)
-- [memory_store.py:695-748](file://backend/core/memory_store.py#L695-L748)
+- [knowledge.py:88-394](file://backend/tools/knowledge.py#L88-L394)
+- [memory_store.py:695-830](file://backend/core/memory_store.py#L695-L830)
 - [build_knowledge.py:61-211](file://build_knowledge.py#L61-L211)
 - [server.py:50-63](file://backend/server.py#L50-L63)
 
 ## Architecture Overview
 The Knowledge Service integrates with the HTTP server and MongoDB to provide two retrieval modes:
 - Persistent knowledge base: Indexed from a configured docs directory and loaded at startup
-- Session-scoped documents: Attached files parsed and indexed per chat session
+- Session-scoped documents: Attached files parsed and indexed per chat session with lazy retriever caching
 
 ```mermaid
 sequenceDiagram
@@ -115,8 +125,8 @@ Server-->>Client : "Reply with context"
 ```
 
 **Diagram sources**
-- [server.py:329-394](file://backend/server.py#L329-L394)
-- [knowledge.py:303-393](file://backend/tools/knowledge.py#L303-L393)
+- [server.py:220-248](file://backend/server.py#L220-L248)
+- [knowledge.py:303-394](file://backend/tools/knowledge.py#L303-L394)
 - [memory_store.py:802-830](file://backend/core/memory_store.py#L802-L830)
 
 ## Detailed Component Analysis
@@ -134,6 +144,7 @@ Implementation highlights:
 - Hybrid retriever using BM25 + FAISS with EnsembleRetriever and MMR scoring
 - Thread-safe operations using a lock for session retriever cache
 - Session retriever cache invalidation on chunk updates
+- Lazy retriever construction for session-scoped documents
 
 ```mermaid
 classDiagram
@@ -158,14 +169,14 @@ class KnowledgeService {
 ```
 
 **Diagram sources**
-- [knowledge.py:88-393](file://backend/tools/knowledge.py#L88-L393)
+- [knowledge.py:88-394](file://backend/tools/knowledge.py#L88-L394)
 
 **Section sources**
 - [knowledge.py:96-140](file://backend/tools/knowledge.py#L96-L140)
 - [knowledge.py:145-230](file://backend/tools/knowledge.py#L145-L230)
 - [knowledge.py:231-264](file://backend/tools/knowledge.py#L231-L264)
 - [knowledge.py:270-298](file://backend/tools/knowledge.py#L270-L298)
-- [knowledge.py:303-393](file://backend/tools/knowledge.py#L303-L393)
+- [knowledge.py:303-394](file://backend/tools/knowledge.py#L303-L394)
 
 ### MemoryStore (MongoDB-backed)
 Responsibilities:
@@ -265,8 +276,8 @@ Key endpoints:
 
 **Section sources**
 - [server.py:50-63](file://backend/server.py#L50-L63)
-- [server.py:329-394](file://backend/server.py#L329-L394)
-- [server.py:276-321](file://backend/server.py#L276-L321)
+- [server.py:220-248](file://backend/server.py#L220-L248)
+- [server.py:165-196](file://backend/server.py#L165-L196)
 
 ## Dependency Analysis
 External libraries and integrations:
@@ -308,8 +319,8 @@ MS["memory_store.py"] --> PM["pymongo"]
 - Incremental indexing: File hash-based change detection avoids reprocessing unchanged documents
 - LM Studio embedding connectivity: Quick connectivity test prevents repeated failures and enables graceful fallback
 - MongoDB indexing: Proper indexes on knowledge_chunks and session_chunks improve retrieval speed
-
-[No sources needed since this section provides general guidance]
+- Lazy retriever construction: Session-scoped retrievers are built on-demand and cached for subsequent searches
+- Cache invalidation: Session retriever cache is automatically cleared when new chunks are added
 
 ## Troubleshooting Guide
 Common issues and resolutions:
@@ -318,24 +329,23 @@ Common issues and resolutions:
 - MongoDB connection failure: MemoryStore raises a runtime error if MongoDB is unreachable
 - Empty or unsupported file types: Server validates file types and sizes before saving and parsing
 - Session retriever errors: KnowledgeService wraps exceptions and returns structured error responses
+- Thread safety issues: KnowledgeService uses locks to prevent race conditions during concurrent retriever access
 
 **Section sources**
 - [knowledge.py:122-138](file://backend/tools/knowledge.py#L122-L138)
 - [knowledge.py:259-264](file://backend/tools/knowledge.py#L259-L264)
 - [memory_store.py:86-99](file://backend/core/memory_store.py#L86-L99)
-- [server.py:326-362](file://backend/server.py#L326-L362)
-- [knowledge.py:294-298](file://backend/tools/knowledge.py#L294-L298)
+- [server.py:220-248](file://backend/server.py#L220-L248)
 - [knowledge.py:353-356](file://backend/tools/knowledge.py#L353-L356)
 
 ## Conclusion
 The Knowledge Service provides a robust, thread-safe RAG implementation with:
 - Persistent knowledge base indexing and incremental updates
-- Session-scoped document search with lazy retriever caching
-- Hybrid BM25+FAISS retriever with automatic fallback
+- Session-scoped document search with lazy retriever caching and automatic cache invalidation
+- Hybrid BM25+FAISS retriever with automatic fallback for both persistent and session searches
 - MongoDB-backed chunk storage and thread-safe operations
 - LM Studio embedding integration and graceful error handling
-
-[No sources needed since this section summarizes without analyzing specific files]
+- Seamless integration with the attachment system for per-chat document processing
 
 ## Appendices
 
@@ -348,8 +358,8 @@ The Knowledge Service provides a robust, thread-safe RAG implementation with:
 - Session retriever cache invalidated for subsequent searches
 
 **Section sources**
-- [server.py:329-394](file://backend/server.py#L329-L394)
-- [knowledge.py:303-335](file://backend/tools/knowledge.py#L303-L335)
+- [server.py:220-248](file://backend/server.py#L220-L248)
+- [knowledge.py:303-336](file://backend/tools/knowledge.py#L303-L336)
 
 #### Persistent Knowledge Base Search
 - Client sends chat request with query
@@ -358,22 +368,37 @@ The Knowledge Service provides a robust, thread-safe RAG implementation with:
 - Results formatted as concatenated context with source metadata
 
 **Section sources**
-- [server.py:276-321](file://backend/server.py#L276-L321)
+- [server.py:165-196](file://backend/server.py#L165-L196)
 - [knowledge.py:270-298](file://backend/tools/knowledge.py#L270-L298)
 
 #### Session-scoped Search
 - Client sends chat request with session_id and query
 - Server delegates to KnowledgeService.search_session
 - KnowledgeService lazily builds retriever from session-scoped chunks and returns formatted context
+- Session retriever cached for subsequent searches in the same session
 
 **Section sources**
-- [server.py:276-321](file://backend/server.py#L276-L321)
-- [knowledge.py:337-356](file://backend/tools/knowledge.py#L337-L356)
+- [server.py:165-196](file://backend/server.py#L165-L196)
+- [knowledge.py:338-356](file://backend/tools/knowledge.py#L338-L356)
 
 ### Configuration and Environment
 - Settings include RAG documents path, LM Studio URL, and MongoDB credentials
 - KnowledgeService initializes LM Studio embeddings when docs_dir is provided
+- Hybrid mode support for enhanced routing capabilities
 
 **Section sources**
-- [config.py:20-76](file://backend/config.py#L20-L76)
+- [config.py:20-87](file://backend/config.py#L20-L87)
 - [knowledge.py:122-138](file://backend/tools/knowledge.py#L122-L138)
+
+### Enhanced Session Management
+The Knowledge Service now provides comprehensive session-scoped document search capabilities:
+
+- **Lazy Retriever Construction**: Session retrievers are built on-demand when the first search is performed
+- **Thread-Safe Caching**: Session retrievers are cached in a thread-safe manner using locks
+- **Automatic Cache Invalidation**: When new chunks are added to a session, the cached retriever is automatically removed
+- **Graceful Error Handling**: Session retrievers return appropriate error messages when no documents are attached
+- **Hybrid Retrieval**: Both BM25-only and BM25+FAISS retrievers are supported for session-scoped searches
+
+**Section sources**
+- [knowledge.py:358-394](file://backend/tools/knowledge.py#L358-L394)
+- [memory_store.py:802-830](file://backend/core/memory_store.py#L802-L830)
