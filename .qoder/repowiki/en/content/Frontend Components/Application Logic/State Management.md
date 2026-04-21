@@ -21,6 +21,9 @@
 - Improved event handling for user interactions with better state mutation patterns
 - Added Smart Routing feature with dynamic model selection capabilities
 - Enhanced memory consent management with improved UI state synchronization
+- **Updated**: Added comprehensive memory consent handling with memoryEnabled and memoryConsent properties
+- **Updated**: Added new functions for memory consent checking and UI gating for memory-related panels
+- **Updated**: Enhanced state management with automatic panel hiding and visual feedback for memory access control
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -29,13 +32,14 @@
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
 6. [Enhanced State Management Patterns](#enhanced-state-management-patterns)
-7. [Dependency Analysis](#dependency-analysis)
-8. [Performance Considerations](#performance-considerations)
-9. [Troubleshooting Guide](#troubleshooting-guide)
-10. [Conclusion](#conclusion)
+7. [Memory Consent Management](#memory-consent-management)
+8. [Dependency Analysis](#dependency-analysis)
+9. [Performance Considerations](#performance-considerations)
+10. [Troubleshooting Guide](#troubleshooting-guide)
+11. [Conclusion](#conclusion)
 
 ## Introduction
-This document explains the enhanced application state management system for the Orbit Virtual Assistant. The system features a centralized appState object with improved state architecture, comprehensive event handling patterns, enhanced markdown rendering capabilities, and robust error handling mechanisms. The state management spans both frontend and backend components, providing seamless user experience with persistent memory storage and intelligent session management.
+This document explains the enhanced application state management system for the Orbit Virtual Assistant. The system features a centralized appState object with improved state architecture, comprehensive event handling patterns, enhanced markdown rendering capabilities, and robust error handling mechanisms. The state management spans both frontend and backend components, providing seamless user experience with persistent memory storage and intelligent session management. **Updated**: The system now includes comprehensive memory consent handling with automatic UI gating and visual feedback for memory access control.
 
 ## Project Structure
 The enhanced state management architecture spans frontend and backend components with improved separation of concerns:
@@ -44,6 +48,7 @@ The enhanced state management architecture spans frontend and backend components
 - **Backend**: State persistence and orchestration via MongoDB-backed MemoryStore with enhanced REST endpoints for sessions, messages, and memory management
 - **Audio Processing**: ASR Whisper integration for voice input with improved state handling
 - **Avatar System**: Enhanced Web Worker-based avatar animation with synchronized state management
+- **Memory Consent System**: **Updated**: Comprehensive memory access control with user consent management and automatic UI gating
 
 ```mermaid
 graph TB
@@ -53,6 +58,7 @@ APP["app.js<br/>Centralized appState<br/>Enhanced State Patterns"]
 AVW["avatar-worker.js<br/>Web Worker Animation"]
 AVX["avatar-renderer.js<br/>Canvas Rendering"]
 MRK["Markdown Renderer<br/>Copy Button Support"]
+MEM["Memory Consent System<br/>UI Gating & Visual Feedback"]
 END
 subgraph "Backend Enhanced Architecture"
 SRV["server.py<br/>REST API<br/>Enhanced Endpoints"]
@@ -68,6 +74,7 @@ SRV --> OB
 APP --> AVW
 AVW --> AVX
 APP --> MRK
+APP --> MEM
 SRV --> ASR
 APP -. uses .-> AVW
 APP -. uses .-> AVX
@@ -104,7 +111,7 @@ The enhanced state management system consists of several key components with imp
 - **Event Binding System**: Robust event handling with improved error propagation
 - **Enhanced Avatar Worker**: Advanced Web Worker-based avatar animation with synchronized state
 - **Smart Routing**: Dynamic model selection based on task complexity
-- **Enhanced Memory Consent**: Improved user consent management with UI synchronization
+- **Enhanced Memory Consent**: **Updated**: Improved user consent management with UI synchronization and automatic panel gating
 
 ### Key State Categories
 - **Chat & Mode Management**: Enhanced mode handling (simple, copilot, coach) with improved state transitions
@@ -113,7 +120,7 @@ The enhanced state management system consists of several key components with imp
 - **Screen Sharing State**: Improved screen capture with better resource management
 - **UI Panel States**: Enhanced panel management with improved user experience
 - **Composer Toggle States**: Advanced toggle management with mutual exclusivity enforcement
-- **Memory Consent Management**: Enhanced user consent handling with improved UI feedback
+- **Memory Consent Management**: **Updated**: Enhanced user consent handling with improved UI feedback and automatic panel locking
 
 **Section sources**
 - [app.js](file://frontend/scripts/app.js)
@@ -137,6 +144,7 @@ SRV->>MS : get_state(), get_history(), get_sessions()
 MS-->>SRV : Enhanced state, history, sessions
 SRV-->>APP : Enhanced JSON payload
 APP->>APP : Enhanced hydrate appState (modes, memory, sessions)
+APP->>APP : Enhanced initializeMemoryConsent()
 APP->>UI : Enhanced render UI based on appState
 UI->>APP : Enhanced user events (mode change, voice toggle, send, etc.)
 APP->>APP : Enhanced mutate appState with error handling
@@ -161,7 +169,7 @@ The enhanced appState provides comprehensive state management with improved patt
 
 **Enhanced State Structure**:
 - **Chat & Mode**: Enhanced mode management with improved state transitions
-- **Memory Management**: Advanced memory consent handling with UI synchronization
+- **Memory Management**: **Updated**: Advanced memory consent handling with UI synchronization and automatic panel gating
 - **Session Management**: Improved session handling with enhanced persistence
 - **Voice Input**: Enhanced speech recognition with better error handling
 - **Screen Sharing**: Improved screen capture with resource management
@@ -173,7 +181,7 @@ The enhanced appState provides comprehensive state management with improved patt
 - **Enhanced Form Values**: Better form initialization with improved validation
 - **Robust Event Binding**: Comprehensive event handling with error propagation
 - **Avatar Worker Setup**: Enhanced Web Worker initialization with improved state management
-- **Memory Consent Handling**: Advanced user consent management with UI feedback
+- **Memory Consent Handling**: **Updated**: Advanced user consent management with UI feedback and automatic panel gating
 
 **Enhanced Mutation Patterns**:
 - **Direct Property Assignment**: Improved state updates with validation
@@ -184,7 +192,7 @@ The enhanced appState provides comprehensive state management with improved patt
 **Enhanced Persistence Mechanisms**:
 - **Local Storage**: Improved persistence of UI state and preferences
 - **MongoDB Integration**: Enhanced session and message persistence
-- **Memory Consent**: Advanced user consent management with improved UI synchronization
+- **Memory Consent**: **Updated**: Advanced user consent management with improved UI synchronization
 
 **Section sources**
 - [app.js](file://frontend/scripts/app.js)
@@ -342,6 +350,71 @@ The enhanced system implements advanced state management patterns:
 - [app.js](file://frontend/scripts/app.js)
 - [server.py](file://backend/server.py)
 
+## Memory Consent Management
+**Updated**: The enhanced system now includes comprehensive memory consent handling with automatic UI gating and visual feedback.
+
+### Memory Consent State Properties
+The appState now includes dedicated properties for memory consent management:
+
+- **memoryEnabled**: Boolean flag indicating whether memory access is currently enabled
+- **memoryConsent**: String value storing user consent state ("accepted", "declined", or empty)
+- **memoryAvailable**: Boolean indicating whether persistent memory storage is available
+
+### Memory Consent UI Elements
+The enhanced UI includes dedicated elements for memory consent management:
+
+- **memoryConsentStatus**: Status display showing current memory consent state
+- **enableMemoryBtn**: Button to enable memory access
+- **disableMemoryBtn**: Button to disable memory access
+- **memoryGatedPanels**: Array of panels gated by memory consent status
+
+### Memory Consent Functions
+The enhanced system provides comprehensive memory consent management functions:
+
+- **initializeMemoryConsent()**: Initializes memory consent based on stored preferences or user confirmation
+- **setMemoryConsent()**: Sets memory consent state and applies UI changes
+- **applyMemoryConsentUI()**: Applies memory consent changes to UI elements and panels
+- **ensureMemoryEnabled()**: Checks if memory is enabled and provides appropriate feedback
+
+### Automatic Panel Gating
+**Updated**: Memory consent automatically gates access to memory-related panels:
+
+- **Automatic Locking**: Panels with `data-memory-gated="true"` attribute are automatically locked when memory is disabled
+- **Visual Feedback**: Locked panels receive "memory-locked" class for visual indication
+- **Control Disabling**: All input controls within gated panels are automatically disabled
+- **State Cleanup**: When memory is disabled, related state views are automatically cleared
+
+### Memory Consent Flow
+The enhanced memory consent flow provides comprehensive user experience:
+
+```mermaid
+flowchart TD
+A[Page Load] --> B{Storage Mode?}
+B --> |Ephemeral| C[Set memoryEnabled=false]
+B --> |Mongo| D{Has Stored Consent?}
+D --> |Yes| E{Consent Value?}
+D --> |No| F[Show Consent Dialog]
+E --> |Accepted| G[Set memoryEnabled=true]
+E --> |Declined| H[Set memoryEnabled=false]
+F --> I{User Accepted?}
+I --> |Yes| J[Set memoryEnabled=true, store "accepted"]
+I --> |No| K[Set memoryEnabled=false, store "declined"]
+G --> L[Apply Memory Consent UI]
+H --> L
+J --> L
+K --> L
+L --> M[Update UI Panels]
+M --> N[Enable/Disable Controls]
+```
+
+**Diagram sources**
+- [app.js](file://frontend/scripts/app.js)
+
+**Section sources**
+- [app.js](file://frontend/scripts/app.js)
+- [server.py](file://backend/server.py)
+- [memory_store.py](file://backend/core/memory_store.py)
+
 ## Dependency Analysis
 The enhanced system maintains improved dependency relationships:
 
@@ -350,6 +423,7 @@ The enhanced system maintains improved dependency relationships:
 - **MemoryStore**: Enhanced backend dependency for session/message persistence
 - **Avatar Worker/Renderer**: Improved Web Worker-based avatar animation
 - **Enhanced Markdown**: Better markdown rendering with copy button support
+- **Memory Consent System**: **Updated**: New dependency for memory access control and UI gating
 
 **Enhanced Backend Dependencies**:
 - **server.py**: Enhanced dependency on MemoryStore for persistence
@@ -366,6 +440,7 @@ SRV --> CFG["Enhanced config.py"]
 APP --> AVW["Enhanced avatar-worker.js"]
 APP --> AVX["Enhanced avatar-renderer.js"]
 APP --> MRK["Enhanced Markdown Renderer"]
+APP --> MEM["Enhanced Memory Consent System"]
 ```
 
 **Diagram sources**
@@ -413,6 +488,15 @@ The enhanced system provides improved performance characteristics:
 - **Selective Conversation Cleanup**: Better conversation cleanup for inactive sessions
 - **Resource Disposal**: Enhanced resource disposal for MediaStreams and object URLs
 - **State Cleanup**: Improved state cleanup with better memory management
+- **Memory Consent Caching**: **Updated**: Efficient memory consent state caching to reduce localStorage overhead
+
+### Enhanced Memory Consent Performance
+**Updated**: Memory consent system includes performance optimizations:
+
+- **Lazy Panel Loading**: Memory-gated panels are only processed when memory consent changes
+- **Efficient DOM Queries**: Optimized DOM queries for memory-gated panels using `querySelectorAll`
+- **State Change Batching**: Multiple state changes are batched to reduce UI reflows
+- **LocalStorage Optimization**: Memory consent state is cached in memory to reduce localStorage reads
 
 ## Troubleshooting Guide
 Enhanced troubleshooting capabilities:
@@ -442,9 +526,18 @@ Enhanced troubleshooting capabilities:
 - **Local Storage Verification**: Enhanced local storage verification
 - **Network Request Monitoring**: Improved network request monitoring
 
+### Enhanced Memory Consent Issues
+**Updated**: New troubleshooting area for memory consent issues:
+
+- **Memory Consent State Verification**: Check if memory consent state is properly stored in localStorage
+- **Panel Gating Verification**: Verify that memory-gated panels are properly locked/disabled
+- **UI Feedback Verification**: Ensure memory consent status messages are displayed correctly
+- **Storage Mode Compatibility**: Verify compatibility between storage mode and memory consent
+- **Memory Access Errors**: Check for "memory_disabled" errors when accessing memory features
+
 **Section sources**
 - [app.js](file://frontend/scripts/app.js)
 - [server.py](file://backend/server.py)
 
 ## Conclusion
-The enhanced Orbit Virtual Assistant employs a significantly improved centralized frontend state model (appState) with robust persistence via localStorage and MongoDB. The enhanced system features comprehensive state management patterns, improved event handling, enhanced markdown rendering with copy button functionality, and more robust error handling throughout the application lifecycle. The major improvements include better state architecture, enhanced user interaction patterns, Smart Routing capabilities, and improved memory consent management. These enhancements enable scalable improvements and maintainable debugging practices while providing a superior user experience through enhanced state synchronization and performance optimizations.
+The enhanced Orbit Virtual Assistant employs a significantly improved centralized frontend state model (appState) with robust persistence via localStorage and MongoDB. The enhanced system features comprehensive state management patterns, improved event handling, enhanced markdown rendering with copy button functionality, and more robust error handling throughout the application lifecycle. **Updated**: The major improvements include better state architecture, enhanced user interaction patterns, Smart Routing capabilities, and comprehensive memory consent management with automatic UI gating and visual feedback. These enhancements enable scalable improvements and maintainable debugging practices while providing a superior user experience through enhanced state synchronization, performance optimizations, and intelligent memory access control. The new memory consent system ensures user privacy and control over data access while maintaining seamless application functionality.

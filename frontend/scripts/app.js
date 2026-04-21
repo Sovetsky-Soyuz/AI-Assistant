@@ -89,6 +89,9 @@ const appState = {
   recentToolEvents: [],
   activeSessionId: null,
   sessions: [],
+  storageMode: "mongo",
+  memoryAvailable: true,
+  ephemeralClientId: "",
   isProcessing: false,
   latestScreenImage: null,
   screenStream: null,
@@ -123,6 +126,7 @@ const elements = {
   newChatBtn: document.getElementById("newChatBtn"),
   sidebarCollapseBtn: document.getElementById("sidebarCollapseBtn"),
   sidebarOpenBtn: document.getElementById("sidebarOpenBtn"),
+  clearAllChatsBtn: document.getElementById("clearAllChatsBtn"),
   pinnedChatsGroup: document.getElementById("pinnedChatsGroup"),
   pinnedChats: document.getElementById("pinnedChats"),
   recentChats: document.getElementById("recentChats"),
@@ -210,8 +214,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   restoreSidebarState();
   setStageState("idle", "Idle", "Orbit Virtual Assistant is running.");
   addMessage("system", "Orbit Virtual Assistant is ready. Type a message, hold Control to talk, or press Ctrl+M to record and review.");
-  await initializeMemoryConsent();
-  await refreshState();
+  appState.ephemeralClientId = generateEphemeralClientId();
+
+  try {
+    await refreshState();
+  } catch (error) {
+    reportActionError(error, "Could not load app state");
+    return;
+  }
+
+  if (appState.storageMode === "mongo") {
+    await initializeMemoryConsent();
+    if (appState.memoryEnabled) {
+      try {
+        await refreshState();
+      } catch (error) {
+        reportActionError(error, "Could not load saved memory state");
+      }
+    }
+  } else {
+    appState.memoryEnabled = false;
+    applyMemoryConsentUI();
+  }
 });
 
 function initializeFormValues() {
@@ -268,6 +292,9 @@ function bindEvents() {
   elements.utilityToggleBtn.addEventListener("click", toggleDrawer);
   elements.utilityCloseBtn.addEventListener("click", toggleDrawer);
   elements.newChatBtn.addEventListener("click", startNewChat);
+  if (elements.clearAllChatsBtn) {
+    elements.clearAllChatsBtn.addEventListener("click", clearAllChats);
+  }
 
   if (elements.chatSettingsBtn && elements.chatSettingsDropdown) {
     elements.chatSettingsBtn.addEventListener("click", (e) => {
@@ -318,7 +345,13 @@ function bindEvents() {
     });
   }
 
-  elements.attachFilesBtn.addEventListener("click", () => elements.fileAttachInput.click());
+  elements.attachFilesBtn.addEventListener("click", () => {
+    if (appState.storageMode === "ephemeral") {
+      addMessage("system", "File attachments require Agent Memory. Restart with MongoDB to attach files to chats.");
+      return;
+    }
+    elements.fileAttachInput.click();
+  });
   elements.fileAttachInput.addEventListener("change", handleFileAttach);
 
   setupToggleChip(elements.createImageBtn, "imageGenActive");
@@ -450,6 +483,7 @@ function startNewChat() {
   elements.attachFilesBtn.classList.remove("active");
   renderSessions(appState.sessions);
   updateSessionActionButtons();
+  updateClearAllChatsState();
   elements.messageInput.focus();
 }
 
@@ -723,6 +757,71 @@ function ensureVoiceTurn() { if (!appState.currentTurn || appState.currentTurn.s
 function ensureVoiceDraft() { if (!appState.currentTurn.userNode) appState.currentTurn.userNode = addMessage("user", "Listening...", "Voice transcript"); }
 function setVoiceStatus(text) { elements.voiceStatus.textContent = text; elements.composerVoiceStatus.textContent = text; }
 
+function generateEphemeralClientId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+  return `ephemeral-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function buildApiHeaders(headers = {}) {
+  const merged = new Headers(headers);
+  if (appState.ephemeralClientId) {
+    merged.set("X-Orbit-Ephemeral-Client", appState.ephemeralClientId);
+  }
+  return merged;
+}
+
+async function readJsonResponse(response) {
+  const rawText = await response.text();
+  if (!rawText) return {};
+  try {
+    return JSON.parse(rawText);
+  } catch (err) {
+    return { detail: rawText };
+  }
+}
+
+async function apiFetch(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: buildApiHeaders(options.headers || {}),
+  });
+  const data = await readJsonResponse(response);
+
+  if (!response.ok) {
+    const message = data.detail || data.message || data.error || response.statusText || "Request failed.";
+    const error = new Error(message);
+    error.status = response.status;
+    error.code = data.code || "";
+    error.data = data;
+    throw error;
+  }
+
+  return data;
+}
+
+function getMemoryUnavailableText() {
+  if (appState.storageMode === "ephemeral") {
+    return "Agent Memory is unavailable because the server is running in Ephemeral Mode. Restart with MongoDB to use saved profile, tasks, notes, pinning, and archiving.";
+  }
+  return "Agent Memory is off. Orbit will not access saved MongoDB memories or write new ones. Weather and news can still be used without being remembered.";
+}
+
+function reportActionError(error, prefix = "") {
+  if (!error) {
+    addMessage("system", prefix || "Request failed.");
+    return;
+  }
+
+  if (error.code === "memory_disabled" || error.code === "missing_ephemeral_client") {
+    addMessage("system", error.message);
+    return;
+  }
+
+  addMessage("system", prefix ? `${prefix}: ${error.message}` : error.message);
+}
+
 function getStoredMemoryConsent() {
   if (appState.memoryConsent === "accepted") return true;
   if (appState.memoryConsent === "declined") return false;
@@ -732,7 +831,11 @@ function getStoredMemoryConsent() {
 function updateMemoryActionButton(button) {
   if (!button) return;
   button.disabled = !appState.memoryEnabled;
-  button.title = appState.memoryEnabled ? "Save to Notes" : "Enable Agent Memory to save notes";
+  button.title = appState.memoryEnabled
+    ? "Save to Notes"
+    : appState.storageMode === "ephemeral"
+      ? "Agent Memory is unavailable in Ephemeral Mode"
+      : "Enable Agent Memory to save notes";
 }
 
 function syncMessageActionButtons() {
@@ -744,25 +847,32 @@ function clearMemoryStateViews() {
   elements.displayNameInput.value = "";
   elements.locationInput.value = "";
   elements.routineInput.value = "";
-  elements.taskList.innerHTML = '<p class="muted">Enable Agent Memory to use saved tasks.</p>';
-  elements.notesList.innerHTML = '<p class="muted">Enable Agent Memory to use saved notes.</p>';
-  elements.memoryHint.textContent = "Agent Memory is off. Orbit will not access saved MongoDB memories.";
+  elements.taskList.innerHTML = `<p class="muted">${appState.storageMode === "ephemeral" ? "Agent Memory is unavailable in Ephemeral Mode." : "Enable Agent Memory to use saved tasks."}</p>`;
+  elements.notesList.innerHTML = `<p class="muted">${appState.storageMode === "ephemeral" ? "Agent Memory is unavailable in Ephemeral Mode." : "Enable Agent Memory to use saved notes."}</p>`;
+  elements.memoryHint.textContent = getMemoryUnavailableText();
 }
 
 function applyMemoryConsentUI() {
   if (elements.memoryConsentStatus) {
     elements.memoryConsentStatus.textContent = appState.memoryEnabled
       ? "Agent Memory is enabled. Orbit can read and save profile, tasks, notes, and long-term context in MongoDB."
-      : "Agent Memory is off. Orbit will not access saved MongoDB memories or write new ones. Weather and news can still be used without being remembered.";
+      : getMemoryUnavailableText();
   }
 
-  if (elements.enableMemoryBtn) elements.enableMemoryBtn.disabled = appState.memoryEnabled;
-  if (elements.disableMemoryBtn) elements.disableMemoryBtn.disabled = !appState.memoryEnabled;
+  if (elements.enableMemoryBtn) {
+    elements.enableMemoryBtn.style.display = appState.storageMode === "ephemeral" ? "none" : "";
+    elements.enableMemoryBtn.disabled = appState.storageMode === "ephemeral" || appState.memoryEnabled;
+  }
+  if (elements.disableMemoryBtn) {
+    elements.disableMemoryBtn.style.display = appState.storageMode === "ephemeral" ? "none" : "";
+    elements.disableMemoryBtn.disabled = appState.storageMode === "ephemeral" || !appState.memoryEnabled;
+  }
 
   elements.memoryGatedPanels.forEach((panel) => {
-    panel.classList.toggle("memory-locked", !appState.memoryEnabled);
+    const locked = !appState.memoryEnabled;
+    panel.classList.toggle("memory-locked", locked);
     panel.querySelectorAll("input, button, select, textarea").forEach((control) => {
-      control.disabled = !appState.memoryEnabled;
+      control.disabled = locked;
     });
   });
 
@@ -771,9 +881,16 @@ function applyMemoryConsentUI() {
   }
 
   syncMessageActionButtons();
+  updateClearAllChatsState();
 }
 
 async function initializeMemoryConsent() {
+  if (appState.storageMode === "ephemeral") {
+    appState.memoryEnabled = false;
+    applyMemoryConsentUI();
+    return;
+  }
+
   const storedConsent = getStoredMemoryConsent();
   if (storedConsent === null) {
     const accepted = window.confirm(
@@ -790,6 +907,13 @@ async function initializeMemoryConsent() {
 }
 
 async function setMemoryConsent(enabled, { announce = false } = {}) {
+  if (appState.storageMode === "ephemeral") {
+    appState.memoryEnabled = false;
+    applyMemoryConsentUI();
+    if (announce) addMessage("system", getMemoryUnavailableText());
+    return;
+  }
+
   appState.memoryEnabled = enabled;
   appState.memoryConsent = enabled ? "accepted" : "declined";
   window.localStorage.setItem("orbit_memory_consent", appState.memoryConsent);
@@ -815,16 +939,22 @@ async function setMemoryConsent(enabled, { announce = false } = {}) {
 
 function ensureMemoryEnabled() {
   if (appState.memoryEnabled) return true;
-  addMessage("system", "Agent Memory is disabled. Enable it in Tools & Settings to use saved profile, tasks, or notes.");
+  addMessage("system", getMemoryUnavailableText());
   return false;
 }
 
 // ---------- API Communication ----------
 
 async function refreshState() {
-  const response = await fetch(`/api/state?include_memory=${appState.memoryEnabled ? "true" : "false"}`);
-  const data = await response.json();
-  appState.memory = data.memory || null;
+  const data = await apiFetch(`/api/state?include_memory=${appState.memoryEnabled ? "true" : "false"}`);
+  appState.storageMode = data.storageMode || "mongo";
+  appState.memoryAvailable = data.memoryAvailable !== false;
+
+  if (appState.storageMode === "ephemeral") {
+    appState.memoryEnabled = false;
+  }
+
+  appState.memory = appState.memoryEnabled ? data.memory || null : null;
 
   if (elements.routingToggle) {
     if (data.enableHybrid) {
@@ -850,8 +980,25 @@ async function refreshState() {
 
   refreshMemoryViews();
   appState.sessions = data.sessions || [];
+  if (appState.activeSessionId && !appState.sessions.some((session) => session.session_id === appState.activeSessionId)) {
+    appState.activeSessionId = null;
+  }
   renderSessions(appState.sessions);
   updateSessionActionButtons();
+  updateClearAllChatsState();
+  if (elements.attachFilesBtn) {
+    elements.attachFilesBtn.title = appState.storageMode === "ephemeral"
+      ? "File attachments require MongoDB-backed Agent Memory"
+      : "Attach files";
+  }
+  applyMemoryConsentUI();
+}
+
+function updateClearAllChatsState() {
+  if (!elements.clearAllChatsBtn) return;
+  const hasSavedSessions = Array.isArray(appState.sessions) && appState.sessions.length > 0;
+  const hasDraftConversation = Array.isArray(appState.conversation) && appState.conversation.length > 0;
+  elements.clearAllChatsBtn.disabled = !hasSavedSessions && !hasDraftConversation;
 }
 
 // ==========================================
@@ -934,28 +1081,29 @@ async function sendPrompt(prompt, options = {}) {
 
   try {
     if (!appState.activeSessionId) {
-      const sessionRes = await fetch("/api/sessions", {
+      const sessionData = await apiFetch("/api/sessions", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ firstMessage: prompt }),
       });
-      const sessionData = await sessionRes.json();
-      if (sessionRes.ok && sessionData.session) {
+      if (sessionData.session) {
         appState.activeSessionId = sessionData.session.session_id;
         await refreshSessions();
       }
     }
-  } catch (err) {}
+  } catch (error) {
+    reportActionError(error, "Could not create chat session");
+  }
 
   const targetSessionId = appState.activeSessionId;
   if (targetSessionId) {
-    fetch(`/api/sessions/${targetSessionId}/messages`, {
+    apiFetch(`/api/sessions/${targetSessionId}/messages`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role: "user", text: prompt }),
-    }).catch(err => {});
+    }).catch(() => {});
   }
 
   try {
-    const response = await fetch("/api/chat", {
+    const data = await apiFetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -975,9 +1123,6 @@ async function sendPrompt(prompt, options = {}) {
         useMemory: appState.memoryEnabled,
       }),
     });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || data.detail || "Chat request failed.");
 
     appState.memory = data.memory || null;
     turn.outputText = data.reply;
@@ -1008,12 +1153,12 @@ async function sendPrompt(prompt, options = {}) {
 
       appState.conversation.push({ role: "assistant", text: data.reply });
       if (targetSessionId) {
-        fetch(`/api/sessions/${targetSessionId}/messages`, {
+        apiFetch(`/api/sessions/${targetSessionId}/messages`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ role: "assistant", text: data.reply }),
-        }).catch(err => {});
+        }).catch(() => {});
       }
-      refreshSessions();
+      await refreshSessions();
     }
 
     refreshMemoryViews();
@@ -1164,15 +1309,6 @@ function setSessionMenuItemMarkup(element, action, session = null) {
   if (element) element.innerHTML = getSessionMenuMarkup(action, session);
 }
 
-async function getResponseErrorMessage(response, fallback = "Request failed.") {
-  try {
-    const data = await response.json();
-    return data.detail || data.message || fallback;
-  } catch (err) {
-    return response.statusText || fallback;
-  }
-}
-
 async function openRenameChat(sessionId) {
   const session = getSessionById(sessionId);
   if (!session) return;
@@ -1184,19 +1320,15 @@ async function openRenameChat(sessionId) {
   if (!trimmedTitle || trimmedTitle === currentTitle) return;
 
   try {
-    const response = await fetch(`/api/sessions/${session.session_id}`, {
+    await apiFetch(`/api/sessions/${session.session_id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: trimmedTitle }),
     });
 
-    if (!response.ok) {
-      throw new Error(await getResponseErrorMessage(response, "Unable to rename chat."));
-    }
-
     await refreshSessions();
   } catch (err) {
-    addMessage("system", `Failed to rename: ${err.message}`);
+    reportActionError(err, "Failed to rename");
   }
 }
 
@@ -1212,20 +1344,16 @@ async function togglePinChat(sessionId, { useActiveFallback = false } = {}) {
   const newPinned = !session.pinned;
 
   try {
-    const response = await fetch(`/api/sessions/${session.session_id}`, {
+    await apiFetch(`/api/sessions/${session.session_id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pinned: newPinned }),
     });
 
-    if (!response.ok) {
-      throw new Error(await getResponseErrorMessage(response, "Unable to update pin state."));
-    }
-
     addMessage("system", newPinned ? "Chat pinned." : "Chat unpinned.");
     await refreshSessions();
   } catch (err) {
-    addMessage("system", `Failed to update pin: ${err.message}`);
+    reportActionError(err, "Failed to update pin");
   }
 }
 
@@ -1241,15 +1369,11 @@ async function toggleArchiveChat(sessionId, { useActiveFallback = false } = {}) 
   const isArchived = !!session.archived;
 
   try {
-    const response = await fetch(`/api/sessions/${session.session_id}`, {
+    await apiFetch(`/api/sessions/${session.session_id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ archived: !isArchived }),
     });
-
-    if (!response.ok) {
-      throw new Error(await getResponseErrorMessage(response, `Unable to ${isArchived ? "unarchive" : "archive"} chat.`));
-    }
 
     if (!isArchived && session.session_id === appState.activeSessionId) {
       startNewChat();
@@ -1258,7 +1382,7 @@ async function toggleArchiveChat(sessionId, { useActiveFallback = false } = {}) 
     addMessage("system", isArchived ? "Chat unarchived." : "Chat archived.");
     await refreshSessions();
   } catch (err) {
-    addMessage("system", `Failed to ${isArchived ? "unarchive" : "archive"}: ${err.message}`);
+    reportActionError(err, `Failed to ${isArchived ? "unarchive" : "archive"}`);
   }
 }
 
@@ -1270,6 +1394,7 @@ async function deleteChat(sessionId, { useActiveFallback = false } = {}) {
     if (useActiveFallback && appState.conversation.length > 0) {
       startNewChat();
       addMessage("system", "Conversation cleared.");
+      updateClearAllChatsState();
     }
     return;
   }
@@ -1277,17 +1402,13 @@ async function deleteChat(sessionId, { useActiveFallback = false } = {}) {
   if (!confirm("Delete this chat permanently?")) return;
 
   try {
-    const response = await fetch(`/api/sessions/${session.session_id}`, { method: "DELETE" });
-
-    if (!response.ok) {
-      throw new Error(await getResponseErrorMessage(response, "Unable to delete chat."));
-    }
+    await apiFetch(`/api/sessions/${session.session_id}`, { method: "DELETE" });
 
     if (session.session_id === appState.activeSessionId) startNewChat();
     addMessage("system", "Chat deleted.");
     await refreshSessions();
   } catch (err) {
-    addMessage("system", `Failed to delete: ${err.message}`);
+    reportActionError(err, "Failed to delete");
   }
 }
 
@@ -1420,28 +1541,35 @@ async function loadSession(sessionId) {
   elements.toolEvents.innerHTML = "";
 
   try {
-    const response = await fetch(`/api/sessions/${sessionId}/messages`);
-    const data = await response.json();
+    const data = await apiFetch(`/api/sessions/${sessionId}/messages`);
     const messages = data.messages || [];
 
     messages.forEach((msg) => {
       addMessage(msg.role, msg.text, "", msg.created_at);
       appState.conversation.push({ role: msg.role, text: msg.text });
     });
-  } catch (err) {}
+  } catch (err) {
+    reportActionError(err, "Failed to load chat");
+  }
 
   renderSessions(appState.sessions);
   updateSessionActionButtons();
+  updateClearAllChatsState();
 }
 
 async function refreshSessions() {
   try {
-    const response = await fetch("/api/sessions?include_archived=true");
-    const data = await response.json();
+    const data = await apiFetch("/api/sessions?include_archived=true");
     appState.sessions = data.sessions || [];
+    if (appState.activeSessionId && !appState.sessions.some((session) => session.session_id === appState.activeSessionId)) {
+      appState.activeSessionId = null;
+    }
     renderSessions(appState.sessions);
     updateSessionActionButtons();
-  } catch (err) {}
+    updateClearAllChatsState();
+  } catch (err) {
+    reportActionError(err, "Failed to refresh chats");
+  }
 }
 
 function updateSessionActionButtons() {
@@ -1450,6 +1578,35 @@ function updateSessionActionButtons() {
   setSessionMenuItemMarkup(elements.pinChatBtn, "pin", session);
   setSessionMenuItemMarkup(elements.archiveChatBtn, "archive", session);
   setSessionMenuItemMarkup(elements.deleteChatBtn, "delete");
+}
+
+async function clearAllChats() {
+  const hasSavedSessions = Array.isArray(appState.sessions) && appState.sessions.length > 0;
+  const hasDraftConversation = Array.isArray(appState.conversation) && appState.conversation.length > 0;
+
+  if (!hasSavedSessions && !hasDraftConversation) {
+    addMessage("system", "There are no chats to clear.");
+    return;
+  }
+
+  if (!confirm("Clear all chats? This will remove every chat in the current scope.")) return;
+
+  if (!hasSavedSessions && hasDraftConversation) {
+    startNewChat();
+    addMessage("system", "Conversation cleared.");
+    updateClearAllChatsState();
+    return;
+  }
+
+  try {
+    const data = await apiFetch("/api/sessions", { method: "DELETE" });
+    const total = Number(data.counts?.sessions || 0);
+    startNewChat();
+    await refreshSessions();
+    addMessage("system", total <= 0 ? "Chats cleared." : total === 1 ? "Cleared 1 chat." : `Cleared ${total} chats.`);
+  } catch (error) {
+    reportActionError(error, "Failed to clear chats");
+  }
 }
 
 // ---------- Memory & Data Views ----------
@@ -1547,18 +1704,20 @@ function renderNotes(notes) {
 async function saveProfile(event) {
   event.preventDefault();
   if (!ensureMemoryEnabled()) return;
-  const response = await fetch("/api/profile", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      displayName: elements.displayNameInput.value.trim(),
-      location: elements.locationInput.value.trim(),
-      routine: elements.routineInput.value.trim(),
-    }),
-  });
-  const data = await response.json();
-  if (!response.ok) { addMessage("system", data.error || "Could not save your profile."); return; }
-  appState.memory = data.memory || null;
-  refreshMemoryViews();
+  try {
+    const data = await apiFetch("/api/profile", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        displayName: elements.displayNameInput.value.trim(),
+        location: elements.locationInput.value.trim(),
+        routine: elements.routineInput.value.trim(),
+      }),
+    });
+    appState.memory = data.memory || null;
+    refreshMemoryViews();
+  } catch (error) {
+    reportActionError(error, "Could not save your profile");
+  }
 }
 
 async function refreshWeather() {
@@ -1566,14 +1725,16 @@ async function refreshWeather() {
   const params = new URLSearchParams();
   if (location) params.set("location", location);
   params.set("use_memory", appState.memoryEnabled ? "true" : "false");
-  const response = await fetch(`/api/weather?${params.toString()}`);
-  const data = await response.json();
-  if (!response.ok) { addMessage("system", data.error || "Could not refresh the weather."); return; }
-  if (appState.memoryEnabled) {
-    appState.memory = data.memory || null;
-    refreshMemoryViews();
-  } else {
-    renderWeather(data.weather);
+  try {
+    const data = await apiFetch(`/api/weather?${params.toString()}`);
+    if (appState.memoryEnabled) {
+      appState.memory = data.memory || null;
+      refreshMemoryViews();
+    } else {
+      renderWeather(data.weather);
+    }
+  } catch (error) {
+    reportActionError(error, "Could not refresh the weather");
   }
 }
 
@@ -1583,58 +1744,64 @@ async function refreshNews() {
   const params = new URLSearchParams();
   params.set("topic", topic);
   params.set("use_memory", appState.memoryEnabled ? "true" : "false");
-  const response = await fetch(`/api/news?${params.toString()}`);
-  const data = await response.json();
-  if (!response.ok) { addMessage("system", data.error || "Could not refresh the news."); return; }
-  if (appState.memoryEnabled) {
-    appState.memory = data.memory || null;
-    refreshMemoryViews();
-  } else {
-    renderNews(data.news);
+  try {
+    const data = await apiFetch(`/api/news?${params.toString()}`);
+    if (appState.memoryEnabled) {
+      appState.memory = data.memory || null;
+      refreshMemoryViews();
+    } else {
+      renderNews(data.news);
+    }
+  } catch (error) {
+    reportActionError(error, "Could not refresh the news");
   }
 }
 
 async function addTask(event) {
   event.preventDefault();
   if (!ensureMemoryEnabled()) return;
-  const response = await fetch("/api/tasks", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      title: elements.taskTitleInput.value.trim(),
-      priority: elements.taskPriorityInput.value,
-      dueDate: elements.taskDueDateInput.value.trim(),
-    }),
-  });
-  const data = await response.json();
-  if (!response.ok) return;
-  elements.taskTitleInput.value = "";
-  elements.taskDueDateInput.value = "";
-  appState.memory = data.memory || null;
-  refreshMemoryViews();
+  try {
+    const data = await apiFetch("/api/tasks", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: elements.taskTitleInput.value.trim(),
+        priority: elements.taskPriorityInput.value,
+        dueDate: elements.taskDueDateInput.value.trim(),
+      }),
+    });
+    elements.taskTitleInput.value = "";
+    elements.taskDueDateInput.value = "";
+    appState.memory = data.memory || null;
+    refreshMemoryViews();
+  } catch (error) {
+    reportActionError(error, "Could not add task");
+  }
 }
 
 async function completeTask(taskRef) {
   if (!ensureMemoryEnabled()) return;
-  const response = await fetch("/api/tasks/complete", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ taskRef }),
-  });
-  const data = await response.json();
-  if (!response.ok) return;
-  appState.memory = data.memory || null;
-  refreshMemoryViews();
+  try {
+    const data = await apiFetch("/api/tasks/complete", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskRef }),
+    });
+    appState.memory = data.memory || null;
+    refreshMemoryViews();
+  } catch (error) {
+    reportActionError(error, "Could not complete task");
+  }
 }
 
 async function deleteNote(noteId) {
   if (!noteId) return;
   if (!ensureMemoryEnabled()) return;
   try {
-    const response = await fetch(`/api/notes/${noteId}`, { method: "DELETE" });
-    if (!response.ok) return;
-    const data = await response.json();
+    const data = await apiFetch(`/api/notes/${noteId}`, { method: "DELETE" });
     appState.memory = data.memory || null;
     refreshMemoryViews();
-  } catch (err) {}
+  } catch (error) {
+    reportActionError(error, "Could not delete note");
+  }
 }
 
 async function addNoteManual(event) {
@@ -1644,17 +1811,17 @@ async function addNoteManual(event) {
   const category = elements.noteCategoryInput.value.trim() || "note";
   if (!text) return;
   try {
-    const response = await fetch("/api/notes", {
+    const data = await apiFetch("/api/notes", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, category }),
     });
-    if (!response.ok) return;
-    const data = await response.json();
     elements.noteTextInput.value = "";
     elements.noteCategoryInput.value = "";
     appState.memory = data.memory || null;
     refreshMemoryViews();
-  } catch (err) {}
+  } catch (error) {
+    reportActionError(error, "Could not save note");
+  }
 }
 
 async function saveMessageAsNote(bodyEl, messageEl) {
@@ -1667,12 +1834,10 @@ async function saveMessageAsNote(bodyEl, messageEl) {
   if (!noteText) return;
   if (noteText.length > 500) noteText = noteText.substring(0, 500) + "...";
   try {
-    const response = await fetch("/api/notes", {
+    const data = await apiFetch("/api/notes", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: noteText, category: "saved" }),
     });
-    if (!response.ok) return;
-    const data = await response.json();
     appState.memory = data.memory || null;
     refreshMemoryViews();
     const btn = messageEl.querySelector(".message-action-btn");
@@ -1682,26 +1847,37 @@ async function saveMessageAsNote(bodyEl, messageEl) {
       btn.classList.add("saved");
       setTimeout(() => { btn.innerHTML = original; btn.classList.remove("saved"); }, 2000);
     }
-  } catch (err) {}
+  } catch (error) {
+    reportActionError(error, "Could not save note");
+  }
 }
 
 // ---------- File Attachment ----------
 
 async function handleFileAttach() {
+  if (appState.storageMode === "ephemeral") {
+    addMessage("system", "File attachments require Agent Memory. Restart with MongoDB to attach files to chats.");
+    elements.fileAttachInput.value = "";
+    return;
+  }
+
   const files = elements.fileAttachInput.files;
   if (!files || files.length === 0) return;
   if (!appState.activeSessionId) {
     try {
-      const sessionRes = await fetch("/api/sessions", {
+      const sessionData = await apiFetch("/api/sessions", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: "File attachment chat" }),
       });
-      const sessionData = await sessionRes.json();
-      if (sessionRes.ok && sessionData.session) {
+      if (sessionData.session) {
         appState.activeSessionId = sessionData.session.session_id;
         await refreshSessions();
       }
-    } catch (err) { elements.fileAttachInput.value = ""; return; }
+    } catch (error) {
+      elements.fileAttachInput.value = "";
+      reportActionError(error, "Could not create file attachment chat");
+      return;
+    }
   }
 
   for (const file of files) {
@@ -1712,19 +1888,19 @@ async function handleFileAttach() {
     addMessage("system", `Uploading ${file.name}...`);
     try {
       const base64Data = await fileToBase64(file);
-      const response = await fetch(`/api/sessions/${appState.activeSessionId}/attachments`, {
+      const data = await apiFetch(`/api/sessions/${appState.activeSessionId}/attachments`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename: file.name, data: base64Data }),
       });
-      const data = await response.json();
-      if (!response.ok) continue;
       if (data.attachment?.parse_error) {
         addMessage("system", `Attached ${file.name} but could not parse for search: ${data.attachment.parse_error}`);
       } else {
         addMessage("system", `Attached ${file.name}. You can now ask questions about it.`);
       }
       elements.attachFilesBtn.classList.add("active");
-    } catch (err) {}
+    } catch (error) {
+      reportActionError(error, `Could not attach ${file.name}`);
+    }
   }
   elements.fileAttachInput.value = "";
 }

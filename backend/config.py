@@ -35,6 +35,7 @@ class Settings:
     ollama_url: str = ""
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_db: str = "orbit_assistant"
+    admin_token: str = ""
 
     # NEW FIELDS FOR HYBRID MODE
     enable_hybrid: bool = False
@@ -78,6 +79,7 @@ def get_settings() -> Settings:
         ollama_url=os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/v1").strip(),
         mongodb_uri=os.getenv("MONGODB_URI", "mongodb://localhost:27017").strip(),
         mongodb_db=os.getenv("MONGODB_DB", "orbit_assistant").strip(),
+        admin_token=os.getenv("ADMIN_TOKEN", "").strip(),
         embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-bge-m3").strip(),
 
         # READ HYBRID SETTINGS FROM .ENV

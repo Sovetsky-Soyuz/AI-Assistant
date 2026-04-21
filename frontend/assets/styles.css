@@ -167,6 +167,33 @@ a:hover {
   color: var(--sidebar-text);
 }
 
+.sidebar-utility-row {
+  padding: 0 12px 8px;
+}
+
+.sidebar-secondary-btn {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--sidebar-border);
+  background: transparent;
+  color: var(--sidebar-muted);
+  font-size: 0.82rem;
+  text-align: left;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.sidebar-secondary-btn:hover:not(:disabled) {
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-secondary-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 
 /* -- Session Navigation -- */
 .session-nav {
