@@ -635,6 +635,24 @@ a:hover {
   max-width: 768px;
   margin: 0 auto;
   padding: 4px 24px;
+  
+  /* Add height limit and vertical scrolling. */
+  max-height: 64px; /* Maximum height of about 2 lines of tags */
+  overflow-y: auto;
+}
+
+/* Custom scrollbar for tool-events to match UI */
+.tool-events::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tool-events::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.tool-events::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .tool-pill {

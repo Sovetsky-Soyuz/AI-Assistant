@@ -10,15 +10,17 @@
 - [requirements.txt](file://requirements.txt)
 - [README.md](file://README.md)
 - [run.py](file://run.py)
+- [High-Fidelity Simultaneous Speech-To-Speech Translation.md](file://knowledge_base/High-Fidelity Simultaneous Speech-To-Speech Translation.md)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive Knowledge Base Builder tool (build_knowledge.py) with CLI interface
-- Enhanced knowledge chunk storage with persistent collections and improved indexing
-- Improved RAG system capabilities with better error handling and performance optimization
-- Added support for session-specific document search with hybrid retrieval
-- Enhanced MongoDB integration with comprehensive indexing and migration capabilities
+- Enhanced Knowledge Management system with new hybrid mode configuration capabilities
+- Improved memory store functionality with comprehensive hybrid mode settings
+- Added new knowledge base processing capabilities for advanced document handling
+- Enhanced CLI tools with improved error handling and performance optimization
+- Added comprehensive documentation for the new High-Fidelity Simultaneous Speech-To-Speech Translation knowledge base document
+- Integrated new hybrid mode configuration with provider selection and model routing options
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -35,14 +37,15 @@
 ## Introduction
 This document explains the Knowledge Lab system with Retrieval-Augmented Generation (RAG) capabilities. It covers the local document processing pipeline using LangChain, FAISS vector database, and BM25 hybrid retrieval. It documents the knowledge base structure, supported file formats, preprocessing steps, indexing workflow, chunking strategies, embedding generation, similarity search algorithms, and practical usage patterns for building knowledge bases, searching local documents, and session-specific document search. It also includes performance optimization techniques and troubleshooting guidance for common indexing issues and memory management considerations.
 
-**Updated** Enhanced with comprehensive Knowledge Base Builder tool and improved persistent storage capabilities.
+**Updated** Enhanced with comprehensive Knowledge Base Builder tool, improved persistent storage capabilities, and new hybrid mode configuration for intelligent model routing.
 
 ## Project Structure
 The Knowledge Lab spans several modules:
 - CLI tool to build and verify knowledge bases with advanced indexing capabilities
 - Knowledge service for persistent and session-scoped retrieval with hybrid BM25 + FAISS
 - MongoDB-backed storage for chunks and session artifacts with comprehensive indexing
-- Server integration and runtime configuration with RAG enablement
+- Server integration and runtime configuration with RAG enablement and hybrid mode support
+- New knowledge base document for High-Fidelity Simultaneous Speech-To-Speech Translation
 
 ```mermaid
 graph TB
@@ -56,13 +59,14 @@ subgraph "Storage"
 MS["backend/core/memory_store.py<br/>MongoDB Persistence"]
 end
 subgraph "Runtime"
-CFG["backend/config.py<br/>Configuration Management"]
-SRV["backend/server.py<br/>HTTP Server Integration"]
+CFG["backend/config.py<br/>Configuration Management<br/>Hybrid Mode Support"]
+SRV["backend/server.py<br/>HTTP Server Integration<br/>Hybrid Routing"]
 RUN["run.py<br/>Entry Point"]
 end
 subgraph "Docs"
 RD["README.md<br/>Documentation"]
 REQ["requirements.txt<br/>Dependencies"]
+KBDOC["High-Fidelity Speech-To-Speech Translation<br/>Knowledge Base Document"]
 end
 BK --> MS
 KS --> MS
@@ -72,17 +76,19 @@ SRV --> CFG
 RUN --> SRV
 RD --> SRV
 REQ --> KS
+KBDOC --> KS
 ```
 
 **Diagram sources**
 - [build_knowledge.py:1-437](file://build_knowledge.py#L1-L437)
 - [knowledge.py:1-394](file://backend/tools/knowledge.py#L1-L394)
-- [memory_store.py:1-947](file://backend/core/memory_store.py#L1-L947)
-- [config.py:1-87](file://backend/config.py#L1-L87)
-- [server.py:1-329](file://backend/server.py#L1-L329)
+- [memory_store.py:1-1330](file://backend/core/memory_store.py#L1-L1330)
+- [config.py:1-89](file://backend/config.py#L1-L89)
+- [server.py:1-589](file://backend/server.py#L1-L589)
 - [README.md:1-218](file://README.md#L1-L218)
 - [requirements.txt:1-29](file://requirements.txt#L1-L29)
 - [run.py:1-6](file://run.py#L1-L6)
+- [High-Fidelity Simultaneous Speech-To-Speech Translation.md:1-510](file://knowledge_base/High-Fidelity Simultaneous Speech-To-Speech Translation.md#L1-L510)
 
 **Section sources**
 - [README.md:164-201](file://README.md#L164-L201)
@@ -92,7 +98,8 @@ REQ --> KS
 - **KnowledgeBuilder**: Standalone CLI tool for scanning, diffing, parsing, chunking, and storing documents into MongoDB for persistent RAG with comprehensive indexing modes
 - **KnowledgeService**: Enhanced knowledge service managing persistent knowledge base and session-scoped document search with hybrid BM25 + FAISS retrievers
 - **MemoryStore**: Comprehensive MongoDB-backed persistence for knowledge chunks, session attachments, and session chunks with advanced indexing and migration capabilities
-- **Server integration**: Enhanced server initialization with KnowledgeService and comprehensive RAG enablement options
+- **Server integration**: Enhanced server initialization with KnowledgeService and comprehensive RAG enablement options including hybrid mode configuration
+- **Hybrid Mode Configuration**: New configuration system supporting intelligent model routing and provider selection
 
 Key responsibilities:
 - Document ingestion and chunking with Markdown-aware separators and comprehensive file format support
@@ -101,21 +108,24 @@ Key responsibilities:
 - Session-scoped retrieval for uploaded files with thread-safe caching
 - Robust error handling, graceful fallbacks, and comprehensive logging
 - MongoDB migration from legacy JSON format with data preservation
+- Intelligent model routing with hybrid mode configuration
 
-**Updated** Enhanced with comprehensive CLI tool, improved error handling, and advanced indexing capabilities.
+**Updated** Enhanced with comprehensive CLI tool, improved error handling, advanced indexing capabilities, and new hybrid mode configuration for intelligent model routing.
 
 **Section sources**
 - [build_knowledge.py:61-211](file://build_knowledge.py#L61-L211)
 - [knowledge.py:88-394](file://backend/tools/knowledge.py#L88-L394)
-- [memory_store.py:67-947](file://backend/core/memory_store.py#L67-L947)
+- [memory_store.py:67-1330](file://backend/core/memory_store.py#L67-L1330)
 - [server.py:23-63](file://backend/server.py#L23-L63)
+- [config.py:40-44](file://backend/config.py#L40-L44)
 
 ## Architecture Overview
-The system integrates a comprehensive CLI indexer and enhanced runtime knowledge service:
+The system integrates a comprehensive CLI indexer and enhanced runtime knowledge service with hybrid mode support:
 - CLI builds the knowledge base by scanning a directory, computing diffs, parsing and chunking documents, and storing them in MongoDB with advanced indexing modes
 - At runtime, the server initializes KnowledgeService with optional LM Studio embeddings to build FAISS indices and an EnsembleRetriever combining BM25 and FAISS
 - Users can attach files to a session; those files are parsed, chunked, and indexed for session-scoped retrieval with hybrid capabilities
 - MongoDB provides comprehensive persistence with advanced indexing and migration from legacy JSON format
+- Hybrid mode configuration enables intelligent model routing with provider selection and model optimization
 
 ```mermaid
 graph TB
@@ -125,6 +135,7 @@ KB_DIR["knowledge_base/<br/>Documents Directory"]
 MS["MemoryStore (MongoDB)<br/>Enhanced Persistence"]
 KS["KnowledgeService<br/>Enhanced RAG System"]
 SRV["AssistantApplication<br/>HTTP Server"]
+CFG["Config Settings<br/>Hybrid Mode"]
 EMB["LM Studio Embeddings<br/>Optional"]
 FAISS["FAISS Index<br/>Vector Database"]
 BM25["BM25 Retriever<br/>Keyword-based"]
@@ -137,7 +148,9 @@ KS --> MS
 KS --> BM25
 KS --> FAISS
 KS --> EN
-KS --> EMB
+KS --> CFG
+SRV --> CFG
+CFG --> EMB
 ```
 
 **Diagram sources**
@@ -145,6 +158,7 @@ KS --> EMB
 - [knowledge.py:122-264](file://backend/tools/knowledge.py#L122-L264)
 - [memory_store.py:119-134](file://backend/core/memory_store.py#L119-L134)
 - [server.py:23-63](file://backend/server.py#L23-L63)
+- [config.py:40-44](file://backend/config.py#L40-L44)
 
 ## Detailed Component Analysis
 
@@ -212,7 +226,7 @@ Summary --> Exit
 - [build_knowledge.py:178-206](file://build_knowledge.py#L178-L206)
 
 ### KnowledgeService (Enhanced RAG System)
-**Updated** Enhanced knowledge service with improved error handling, thread-safe caching, and comprehensive hybrid retrieval capabilities.
+**Updated** Enhanced knowledge service with improved error handling, thread-safe caching, comprehensive hybrid retrieval capabilities, and hybrid mode integration.
 
 Responsibilities:
 - Initialize knowledge base at startup by scanning docs_dir, detecting changes, and indexing new/changed files
@@ -220,59 +234,27 @@ Responsibilities:
 - Provide persistent knowledge base search with comprehensive error handling
 - Manage session-scoped document indexing and search with thread-safe caching
 - Lazy caching of session retrievers with thread-safe invalidation and automatic cleanup
+- **Hybrid mode integration**: Intelligent model routing based on configuration settings
 
 Initialization and indexing:
 - Ensures knowledge_base directory exists with comprehensive error handling
 - Computes diffs and removes stale chunks for deleted files with batch operations
 - Parses and indexes new/changed files with comprehensive error handling
 - Loads all chunks and builds retrievers with fallback mechanisms
+- Integrates with hybrid mode configuration for intelligent routing
 
 Hybrid retrieval:
 - BM25 retriever with top-k=5 and comprehensive document conversion
 - FAISS retriever with MMR (k=5, fetch_k=20, lambda_mult=0.5) when embeddings are available
 - EnsembleRetriever with equal weights (0.5, 0.5) for balanced hybrid search
 - Automatic fallback to BM25-only when FAISS fails
+- **Enhanced**: Supports hybrid mode configuration for intelligent model routing
 
 Session-scoped search:
 - Stores session attachments and chunks with comprehensive metadata
 - Builds BM25 retriever per session with optional hybrid FAISS when sufficient chunks
 - Thread-safe caching with invalidation on new chunks using locks
 - Automatic cleanup on session deletion with attachment removal
-
-```mermaid
-classDiagram
-class KnowledgeService {
-+MemoryStore memory_store
-+str docs_dir
-+str upload_dir
-+OpenAIEmbeddings embeddings
-+EnsembleRetriever kb_retriever
-+dict~str, Any~ _session_retrievers
-+RecursiveCharacterTextSplitter _text_splitter
-+_initialize_knowledge_base()
-+_build_retriever(docs) EnsembleRetriever
-+search(query) dict
-+index_session_file(session_id, attachment_id, file_path, filename) int
-+search_session(session_id, query) dict
-+cleanup_session(session_id) void
-}
-class MemoryStore {
-+get_knowledge_file_hashes() dict
-+store_knowledge_chunks(source_file, file_hash, chunks) int
-+get_all_knowledge_chunks() list
-+delete_knowledge_file(source_file) void
-+clear_all_knowledge_chunks() int
-+add_session_attachment(...)
-+store_session_chunks(...)
-+get_session_chunks(session_id) list
-+delete_session_attachment(attachment_id) dict
-}
-KnowledgeService --> MemoryStore : "uses"
-```
-
-**Diagram sources**
-- [knowledge.py:88-394](file://backend/tools/knowledge.py#L88-L394)
-- [memory_store.py:67-947](file://backend/core/memory_store.py#L67-L947)
 
 **Section sources**
 - [knowledge.py:88-230](file://backend/tools/knowledge.py#L88-L230)
@@ -282,7 +264,7 @@ KnowledgeService --> MemoryStore : "uses"
 - [knowledge.py:337-394](file://backend/tools/knowledge.py#L337-L394)
 
 ### MemoryStore (Enhanced MongoDB Persistence)
-**Updated** Comprehensive MongoDB-backed persistence with advanced indexing, migration capabilities, and thread-safe operations.
+**Updated** Comprehensive MongoDB-backed persistence with advanced indexing, migration capabilities, thread-safe operations, and hybrid mode support.
 
 Responsibilities:
 - Define collections for sessions, messages, profile, notes, tasks, activity, cache, knowledge_chunks, session_attachments, session_chunks
@@ -293,6 +275,7 @@ Responsibilities:
 - **Migration capabilities**: Import from legacy JSON format with data preservation
 - **Thread-safe operations**: Lock-based access control for concurrent operations
 - **Data validation**: Comprehensive input validation and error handling
+- **Hybrid mode support**: Enhanced configuration management for intelligent routing
 
 Indexes:
 - **knowledge_chunks**: unique chunk_id, source_file, file_hash for efficient retrieval
@@ -305,6 +288,7 @@ Indexes:
 - **Batch operations**: Efficient bulk insertions and deletions for large datasets
 - **Data consistency**: Atomic operations with proper error handling
 - **Performance optimization**: Optimized queries with appropriate indexing strategies
+- **Hybrid mode configuration**: Support for intelligent model routing settings
 
 ```mermaid
 erDiagram
@@ -346,11 +330,10 @@ SESSION_ATTACHMENTS ||..o{ SESSION_CHUNKS : "contains"
 **Section sources**
 - [memory_store.py:51-62](file://backend/core/memory_store.py#L51-L62)
 - [memory_store.py:119-134](file://backend/core/memory_store.py#L119-L134)
-- [memory_store.py:695-748](file://backend/core/memory_store.py#L695-L748)
-- [memory_store.py:802-947](file://backend/core/memory_store.py#L802-L947)
+- [memory_store.py:1230-1330](file://backend/core/memory_store.py#L1230-L1330)
 
 ### Server Integration and Runtime
-**Updated** Enhanced server integration with comprehensive RAG enablement options and improved error handling.
+**Updated** Enhanced server integration with comprehensive RAG enablement options, improved error handling, and hybrid mode configuration support.
 
 - AssistantApplication constructs MemoryStore and KnowledgeService with comprehensive initialization
 - KnowledgeService is always instantiated; RAG is enabled when docs_dir is provided with user choice
@@ -358,6 +341,7 @@ SESSION_ATTACHMENTS ||..o{ SESSION_CHUNKS : "contains"
 - Chat endpoint routes to the assistant; knowledge search is integrated via KnowledgeService with comprehensive error handling
 - **Hybrid mode**: Enhanced configuration with provider selection and model routing options
 - **Migration support**: Automatic migration from legacy JSON format to MongoDB
+- **Hybrid mode integration**: Intelligent model routing based on configuration settings
 
 ```mermaid
 sequenceDiagram
@@ -365,6 +349,7 @@ participant Client as "Client"
 participant Server as "AssistantApplication"
 participant KS as "KnowledgeService"
 participant MS as "MemoryStore"
+participant Config as "Config Settings"
 Client->>Server : POST /api/sessions/ : id/attachments
 Server->>Server : Save base64 file to disk
 Server->>MS : add_session_attachment(...)
@@ -373,6 +358,8 @@ KS->>KS : Parse + chunk with UnstructuredLoader + splitter
 KS->>MS : store_session_chunks(...)
 Server-->>Client : {ok, attachment}
 Client->>Server : POST /api/chat
+Server->>Config : Check hybrid mode settings
+Config-->>Server : Provider/model routing
 Server->>KS : search(query) or search_session(session_id, query)
 KS->>MS : get_*_chunks(...)
 KS->>KS : Build retriever (BM25 + optional FAISS)
@@ -381,18 +368,40 @@ Server-->>Client : Reply with context
 ```
 
 **Diagram sources**
-- [server.py:329-394](file://backend/server.py#L329-L394)
+- [server.py:367-465](file://backend/server.py#L367-L465)
 - [server.py:276-320](file://backend/server.py#L276-L320)
 - [knowledge.py:303-335](file://backend/tools/knowledge.py#L303-L335)
 - [knowledge.py:337-394](file://backend/tools/knowledge.py#L337-L394)
+- [config.py:40-44](file://backend/config.py#L40-L44)
 
 **Section sources**
 - [server.py:23-63](file://backend/server.py#L23-L63)
-- [server.py:329-394](file://backend/server.py#L329-L394)
+- [server.py:367-465](file://backend/server.py#L367-L465)
 - [server.py:566-611](file://backend/server.py#L566-L611)
 
+### Hybrid Mode Configuration
+**New** Comprehensive hybrid mode configuration system for intelligent model routing and provider selection.
+
+Responsibilities:
+- **Provider selection**: Support for multiple providers (Google, OpenRouter, LM Studio, Ollama)
+- **Model routing**: Intelligent routing of complex tasks to specialized models
+- **Configuration management**: Centralized settings for hybrid mode operation
+- **Integration**: Seamless integration with KnowledgeService and server components
+
+Key features:
+- **Enable/disable hybrid mode**: Toggle hybrid functionality at runtime
+- **Provider configuration**: Select primary provider and hybrid provider
+- **Model selection**: Choose specific models for hybrid routing
+- **Smart routing**: Intelligent task classification and model selection
+- **Fallback mechanisms**: Graceful fallback when hybrid models are unavailable
+
+**Section sources**
+- [config.py:40-44](file://backend/config.py#L40-L44)
+- [config.py:85-88](file://backend/config.py#L85-L88)
+- [server.py:541-552](file://backend/server.py#L541-L552)
+
 ## Dependency Analysis
-**Updated** Enhanced dependency management with comprehensive RAG support and improved package organization.
+**Updated** Enhanced dependency management with comprehensive RAG support, improved package organization, and hybrid mode integration.
 
 External libraries and their roles:
 - **LangChain ecosystem**: document loaders, text splitters, FAISS vectorstore, BM25 retriever, EnsembleRetriever
@@ -402,6 +411,7 @@ External libraries and their roles:
 - **langchain-openai**: OpenAI-compatible embeddings (for LM Studio)
 - **pymongo**: MongoDB driver with comprehensive database operations
 - **Enhanced packages**: Additional support for image files (PNG, JPG, JPEG) and improved error handling
+- **Hybrid mode dependencies**: Enhanced configuration management and model routing capabilities
 
 ```mermaid
 graph TB
@@ -414,6 +424,7 @@ FAISS["faiss-cpu<br/>Vector search"]
 RBM25["rank-bm25<br/>Keyword retrieval"]
 UNSTR["unstructured<br/>Document parsing"]
 PYMONGO["pymongo<br/>Database operations"]
+CONFIG["config.py<br/>Hybrid mode settings"]
 REQ --> LC
 REQ --> LTX
 REQ --> LOA
@@ -422,6 +433,8 @@ REQ --> FAISS
 REQ --> RBM25
 REQ --> UNSTR
 REQ --> PYMONGO
+CONFIG --> KNOWLEDGE["knowledge.py<br/>Hybrid integration"]
+CONFIG --> SERVER["server.py<br/>Routing logic"]
 ```
 
 **Diagram sources**
@@ -431,7 +444,7 @@ REQ --> PYMONGO
 - [requirements.txt:19-29](file://requirements.txt#L19-L29)
 
 ## Performance Considerations
-**Updated** Enhanced performance optimization with comprehensive indexing strategies and memory management.
+**Updated** Enhanced performance optimization with comprehensive indexing strategies, memory management, and hybrid mode considerations.
 
 - **Chunk sizing and overlap**: 1200 characters with 200-character overlap balances recall and context length; adjust based on document density and query complexity
 - **Hybrid retrieval**: FAISS with MMR improves diversity and precision; enable only when embeddings are available and reliable
@@ -440,13 +453,15 @@ REQ --> PYMONGO
   - Session retrievers are cached per session and invalidated on new chunks with thread-safe locking
   - FAISS index construction can be expensive; monitor build time and consider limiting concurrent builds
   - **Enhanced**: Thread-safe operations with proper locking for concurrent access
+  - **Hybrid mode**: Intelligent model routing reduces computational overhead by selecting optimal models
 - **Embedding model**: LM Studio embeddings are used when available; connectivity checks prevent runtime failures
 - **MongoDB indexing**: Ensure indexes exist on knowledge_chunks and session_chunks for fast retrieval
 - **Batch operations**: MongoDB bulk operations for efficient data processing
 - **Migration optimization**: One-time migration from JSON format with optimized data transfer
+- **Hybrid mode optimization**: Smart routing reduces latency by using appropriate models for different task types
 
 ## Troubleshooting Guide
-**Updated** Comprehensive troubleshooting guide with enhanced error handling and resolution strategies.
+**Updated** Comprehensive troubleshooting guide with enhanced error handling, resolution strategies, and hybrid mode considerations.
 
 Common issues and resolutions:
 - **RAG dependencies missing**:
@@ -473,7 +488,7 @@ Common issues and resolutions:
   - Resolution: Confirm file format is supported; check file integrity; retry with smaller files
   - Section sources
     - [knowledge.py:312-318](file://backend/tools/knowledge.py#L312-L318)
-    - [server.py:340-347](file://backend/server.py#L340-L347)
+    - [server.py:434-465](file://backend/server.py#L434-L465)
 
 - **Empty knowledge base**:
   - Symptom: No results from KB search
@@ -486,13 +501,13 @@ Common issues and resolutions:
   - Symptom: Upload rejected due to size or type
   - Resolution: Respect max size and supported extensions; convert or compress files as needed
   - Section sources
-    - [server.py:326-361](file://backend/server.py#L326-L361)
+    - [server.py:434-465](file://backend/server.py#L434-L465)
 
 - **Legacy JSON migration issues**:
   - Symptom: Data not found after migration
   - Resolution: Check migration logs; verify JSON files exist; ensure proper file permissions
   - Section sources
-    - [memory_store.py:836-947](file://backend/core/memory_store.py#L836-L947)
+    - [memory_store.py:1230-1330](file://backend/core/memory_store.py#L1230-L1330)
 
 - **Knowledge base builder errors**:
   - Symptom: CLI tool fails during indexing
@@ -500,10 +515,17 @@ Common issues and resolutions:
   - Section sources
     - [build_knowledge.py:157-165](file://build_knowledge.py#L157-L165)
 
-## Conclusion
-**Updated** Enhanced conclusion reflecting comprehensive improvements to the Knowledge Lab system.
+- **Hybrid mode configuration issues**:
+  - Symptom: Hybrid mode not functioning as expected
+  - Resolution: Verify .env configuration; check provider URLs; ensure proper model availability
+  - Section sources
+    - [config.py:85-88](file://backend/config.py#L85-L88)
+    - [server.py:541-552](file://backend/server.py#L541-L552)
 
-The Knowledge Lab system provides a robust, incremental, and hybrid RAG pipeline with comprehensive capabilities. Documents are parsed, chunked, and stored in MongoDB, enabling fast BM25 retrieval and optional FAISS-based hybrid search powered by LM Studio embeddings. The system supports both persistent knowledge base and session-scoped document search, with careful attention to performance, reliability, and user experience. The enhanced Knowledge Base Builder tool provides comprehensive CLI capabilities for advanced indexing, while the improved MemoryStore offers robust persistence with migration capabilities and thread-safe operations.
+## Conclusion
+**Updated** Enhanced conclusion reflecting comprehensive improvements to the Knowledge Lab system with hybrid mode support.
+
+The Knowledge Lab system provides a robust, incremental, and hybrid RAG pipeline with comprehensive capabilities. Documents are parsed, chunked, and stored in MongoDB, enabling fast BM25 retrieval and optional FAISS-based hybrid search powered by LM Studio embeddings. The system supports both persistent knowledge base and session-scoped document search, with careful attention to performance, reliability, and user experience. The enhanced Knowledge Base Builder tool provides comprehensive CLI capabilities for advanced indexing, while the improved MemoryStore offers robust persistence with migration capabilities and thread-safe operations. The new hybrid mode configuration enables intelligent model routing and provider selection, optimizing performance and resource utilization for different task types.
 
 ## Appendices
 
@@ -522,7 +544,7 @@ The Knowledge Lab system provides a robust, incremental, and hybrid RAG pipeline
 - **Session-specific document search**:
   - Attach files to a session; the system indexes them and allows targeted retrieval per session
   - Section sources
-    - [server.py:329-394](file://backend/server.py#L329-L394)
+    - [server.py:434-465](file://backend/server.py#L434-L465)
     - [knowledge.py:337-394](file://backend/tools/knowledge.py#L337-L394)
 
 - **Advanced CLI operations**:
@@ -533,11 +555,22 @@ The Knowledge Lab system provides a robust, incremental, and hybrid RAG pipeline
 - **Configuration and environment**:
   - Configure MongoDB, RAG docs path, and provider settings via .env; ensure dependencies are installed
   - Section sources
-    - [config.py:55-87](file://backend/config.py#L55-L87)
+    - [config.py:55-89](file://backend/config.py#L55-L89)
     - [README.md:104-136](file://README.md#L104-L136)
     - [requirements.txt:19-29](file://requirements.txt#L19-L29)
 
 - **Legacy data migration**:
   - Automatic migration from JSON format to MongoDB with data preservation
   - Section sources
-    - [memory_store.py:836-947](file://backend/core/memory_store.py#L836-L947)
+    - [memory_store.py:1230-1330](file://backend/core/memory_store.py#L1230-L1330)
+
+- **Hybrid mode configuration**:
+  - Enable and configure hybrid mode for intelligent model routing and provider selection
+  - Section sources
+    - [config.py:40-44](file://backend/config.py#L40-L44)
+    - [server.py:541-552](file://backend/server.py#L541-L552)
+
+- **New knowledge base document**:
+  - Access the comprehensive High-Fidelity Simultaneous Speech-To-Speech Translation knowledge base
+  - Section sources
+    - [High-Fidelity Simultaneous Speech-To-Speech Translation.md:1-510](file://knowledge_base/High-Fidelity Simultaneous Speech-To-Speech Translation.md#L1-L510)

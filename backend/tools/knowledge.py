@@ -10,7 +10,12 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from langchain_unstructured import UnstructuredLoader as UnstructuredFileLoader
+    # from langchain_unstructured import UnstructuredLoader as UnstructuredFileLoader
+
+    from pymupdf4llm import pymupdf4llm
+    from docling.document_converter import DocumentConverter
+    from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
+
 except ImportError:
     from langchain_community.document_loaders import UnstructuredFileLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -107,6 +112,21 @@ class KnowledgeService:
         self._session_retrievers: dict[str, Any] = {}
         self._lock = threading.Lock()
 
+        self._md_splitter = MarkdownHeaderTextSplitter(
+            headers_to_split_on=[
+                ("#", "Header 1"),
+                ("##", "Header 2"),
+                ("###", "Header 3"),
+                ("####", "Header 4"),
+                ("#####", "Header 5"),
+                ("######", "Header 6"),
+                ("#######", "Header 7"),
+                ("#########", "Header 8"),
+                ("##########", "Header 9"),
+                ("###########", "Header 10"),
+            ]
+        )
+
         self._text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1200,
             chunk_overlap=200,
@@ -114,6 +134,8 @@ class KnowledgeService:
             strip_whitespace=True,
             separators=_MARKDOWN_SEPARATORS,
         )
+
+        self.doc_converter = DocumentConverter()
 
         # Ensure upload directory exists
         if self.upload_dir:
@@ -192,9 +214,16 @@ class KnowledgeService:
 
             for rel_path, full_path in new_or_changed:
                 try:
-                    loader = UnstructuredFileLoader(full_path)
-                    docs = loader.load()
-                    splits = self._text_splitter.split_documents(docs)
+                    # loader = UnstructuredFileLoader(full_path)
+                    # docs = loader.load()
+                    # splits = self._text_splitter.split_documents(docs)
+
+                    docling_result = self.doc_converter.convert(full_path)
+                    md_text = docling_result.document.export_to_markdown()
+
+                    md_splits = self._md_splitter.split_text(md_text)
+                    splits = self._text_splitter.split_documents(md_splits)
+
                     chunks = [
                         {
                             "text": s.page_content,
@@ -308,12 +337,33 @@ class KnowledgeService:
         file_path: str,
         filename: str,
     ) -> int:
-        """Parse, chunk, and store a file for session-scoped search.
-        Returns the number of chunks created."""
+        """Parse, chunk, and store a file for session-scoped search using PyMuPDF4LLM."""
         try:
-            loader = UnstructuredFileLoader(file_path)
-            docs = loader.load()
-            splits = self._text_splitter.split_documents(docs)
+            ext = os.path.splitext(filename)[1].lower()
+            md_text = ""
+
+            # Intelligent routing: PDF uses PyMuPDF4LLM for faster processing
+            if ext == ".pdf":
+                md_text = pymupdf4llm.to_markdown(file_path)
+            # Text/MD is read directly.
+            elif ext in [".txt", ".md", ".csv", ".json"]:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    md_text = f.read()
+            else:
+                # If the user uploads a Word document (.docx) to the chat window, the fallback will use Docling.
+
+                # (It will be slightly slower but guaranteed to be error-free)
+
+                docling_result = self.doc_converter.convert(file_path)
+                md_text = docling_result.document.export_to_markdown()
+
+            if not md_text.strip():
+                raise ValueError("Extracted text is empty. File might be an image scan without OCR.")
+
+            # Double chunk
+            md_splits = self._md_splitter.split_text(md_text)
+            splits = self._text_splitter.split_documents(md_splits)
+
         except Exception as exc:
             logger.error("Failed to parse %s: %s", filename, exc)
             raise ValueError(f"Could not parse file '{filename}': {exc}") from exc

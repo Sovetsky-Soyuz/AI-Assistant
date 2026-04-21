@@ -132,10 +132,14 @@ class MemoryStore:
         if self.is_ephemeral:
             return
 
-        assert self._sessions and self._messages and self._tasks and self._notes
-        assert self._activity and self._knowledge_chunks and self._session_attachments and self._session_chunks
+        # assert self._sessions and self._messages and self._tasks and self._notes
+        # assert self._activity and self._knowledge_chunks and self._session_attachments and self._session_chunks
+
+        assert self._sessions is not None and self._messages is not None and self._tasks is not None and self._notes is not None
+        assert self._activity is not None and self._knowledge_chunks is not None and self._session_attachments is not None and self._session_chunks is not None
 
         self._sessions.create_index("session_id", unique=True)
+
         self._sessions.create_index([("pinned", DESCENDING), ("updated_at", DESCENDING)])
         self._messages.create_index([("session_id", ASCENDING), ("created_at", ASCENDING)])
         self._messages.create_index("message_id", unique=True)
@@ -155,7 +159,10 @@ class MemoryStore:
         if self.is_ephemeral:
             return
 
-        assert self._profile
+        # assert self._profile
+
+        assert self._profile is not None
+
         if self._profile.find_one({"_id": "user_profile"}) is None:
             self._profile.insert_one(
                 {
@@ -278,7 +285,10 @@ class MemoryStore:
                 state = self._get_ephemeral_client_locked(client_id)
                 return self._get_state_for_ephemeral_client_locked(state)
 
-        assert self._profile and self._tasks and self._notes and self._activity and self._cache
+        # assert self._profile and self._tasks and self._notes and self._activity and self._cache
+
+        assert self._profile is not None and self._tasks is not None and self._notes is not None and self._activity is not None and self._cache is not None
+
         with self._lock:
             profile_doc = self._profile.find_one({"_id": "user_profile"}) or {}
             task_docs = list(self._tasks.find().sort("created_at", ASCENDING))
@@ -341,7 +351,10 @@ class MemoryStore:
         routine: str | None = None,
     ) -> dict[str, Any]:
         self._require_persistent_memory()
-        assert self._profile
+
+        # assert self._profile
+
+        assert self._profile is not None
 
         updates: dict[str, Any] = {"updated_at": utc_now()}
         if display_name is not None:
@@ -362,7 +375,10 @@ class MemoryStore:
 
     def remember_note(self, note: str, category: str = "note") -> dict[str, Any]:
         self._require_persistent_memory()
-        assert self._notes
+
+        # assert self._notes
+
+        assert self._notes is not None
 
         cleaned_note = note.strip()
         if not cleaned_note:
@@ -392,7 +408,10 @@ class MemoryStore:
         self, title: str, priority: str = "medium", due_date: str | None = None
     ) -> dict[str, Any]:
         self._require_persistent_memory()
-        assert self._tasks
+
+        # assert self._tasks
+
+        assert self._tasks is not None
 
         cleaned_title = title.strip()
         if not cleaned_title:
@@ -440,7 +459,10 @@ class MemoryStore:
 
     def complete_task(self, task_ref: str) -> dict[str, Any]:
         self._require_persistent_memory()
-        assert self._tasks
+
+        # assert self._tasks
+
+        assert self._tasks is not None
 
         reference = (task_ref or "").strip().lower()
         if not reference:
@@ -480,7 +502,10 @@ class MemoryStore:
 
     def delete_task(self, task_ref: str) -> dict[str, Any]:
         self._require_persistent_memory()
-        assert self._tasks
+
+        # assert self._tasks
+
+        assert self._tasks is not None
 
         reference = (task_ref or "").strip().lower()
         if not reference:
@@ -512,7 +537,10 @@ class MemoryStore:
 
     def delete_note(self, note_id: str) -> dict[str, Any]:
         self._require_persistent_memory()
-        assert self._notes
+
+        # assert self._notes
+
+        assert self._notes is not None
 
         nid = (note_id or "").strip()
         if not nid:
@@ -547,7 +575,10 @@ class MemoryStore:
                 )
             return
 
-        assert self._cache
+        # assert self._cache
+
+        assert self._cache is not None
+
         with self._lock:
             self._cache.update_one(
                 {"_id": "last_weather"},
@@ -570,7 +601,10 @@ class MemoryStore:
                 )
             return
 
-        assert self._cache
+        # assert self._cache
+
+        assert self._cache is not None
+
         with self._lock:
             self._cache.update_one(
                 {"_id": "last_news"},
@@ -624,7 +658,10 @@ class MemoryStore:
                 state.sessions[target_session_id]["updated_at"] = utc_now()
             return
 
-        assert self._sessions and self._messages
+        # assert self._sessions and self._messages
+
+        assert self._sessions is not None and self._messages is not None
+
         with self._lock:
             if not session_id:
                 default = self._sessions.find_one({"title": "Default"})
@@ -689,7 +726,10 @@ class MemoryStore:
                 for m in docs
             ]
 
-        assert self._messages
+        # assert self._messages
+
+        assert self._messages is not None
+
         with self._lock:
             query: dict[str, Any] = {}
             if session_id:
@@ -731,7 +771,10 @@ class MemoryStore:
                 )
             return dict(doc)
 
-        assert self._sessions
+        # assert self._sessions
+
+        assert self._sessions is not None
+
         with self._lock:
             self._sessions.insert_one(doc)
             self._append_activity_record(
@@ -757,7 +800,10 @@ class MemoryStore:
                 reverse=True,
             )
 
-        assert self._sessions
+        # assert self._sessions
+
+        assert self._sessions is not None
+
         query: dict[str, Any] = {} if include_archived else {"archived": {"$ne": True}}
         with self._lock:
             docs = list(
@@ -774,7 +820,10 @@ class MemoryStore:
                 doc = state.sessions.get(session_id)
                 return dict(doc) if doc else None
 
-        assert self._sessions
+        # assert self._sessions
+
+        assert self._sessions is not None
+
         with self._lock:
             doc = self._sessions.find_one({"session_id": session_id})
         if doc is None:
@@ -810,7 +859,10 @@ class MemoryStore:
                 )
                 return dict(session)
 
-        assert self._sessions
+        # assert self._sessions
+
+        assert self._sessions is not None
+
         updates["updated_at"] = utc_now()
         with self._lock:
             result = self._sessions.find_one_and_update(
@@ -833,7 +885,10 @@ class MemoryStore:
                 )
             return []
 
-        assert self._session_attachments and self._sessions and self._messages and self._session_chunks
+        # assert self._session_attachments and self._sessions and self._messages and self._session_chunks
+
+        assert self._session_attachments is not None and self._sessions is not None and self._messages is not None and self._session_chunks is not None
+
         with self._lock:
             attachments = [
                 self._strip_id(a)
@@ -869,7 +924,10 @@ class MemoryStore:
                 "session_ids": [],
             }
 
-        assert self._sessions and self._messages and self._session_attachments and self._session_chunks
+        # assert self._sessions and self._messages and self._session_attachments and self._session_chunks
+
+        assert self._session_attachments is not None and self._sessions is not None and self._messages is not None and self._session_chunks is not None
+
         with self._lock:
             session_docs = list(self._sessions.find({}, {"session_id": 1}))
             session_ids = [doc.get("session_id", "") for doc in session_docs if doc.get("session_id")]
@@ -947,7 +1005,10 @@ class MemoryStore:
                 state.sessions[session_id] = session
             return dict(doc)
 
-        assert self._messages and self._sessions
+        # assert self._messages and self._sessions
+
+        assert self._messages is not None and self._sessions is not None
+
         with self._lock:
             self._messages.insert_one(doc)
             self._sessions.update_one(
@@ -968,7 +1029,10 @@ class MemoryStore:
                 docs = docs[:limit]
             return [dict(doc) for doc in docs]
 
-        assert self._messages
+        # assert self._messages
+
+        assert self._messages is not None
+
         with self._lock:
             cursor = self._messages.find({"session_id": session_id}).sort(
                 "created_at", ASCENDING
@@ -988,7 +1052,10 @@ class MemoryStore:
                     ]
             return
 
-        assert self._messages
+        # assert self._messages
+
+        assert self._messages is not None
+
         with self._lock:
             self._messages.delete_one({"message_id": message_id})
 
@@ -1001,7 +1068,10 @@ class MemoryStore:
                     if chunks
                 }
 
-        assert self._knowledge_chunks
+        # assert self._knowledge_chunks
+
+        assert self._knowledge_chunks is not None
+
         with self._lock:
             pipeline = [
                 {"$group": {"_id": "$source_file", "hash": {"$first": "$file_hash"}}},
@@ -1030,7 +1100,10 @@ class MemoryStore:
                 self._knowledge_chunks_ram[source_file] = docs
             return len(docs)
 
-        assert self._knowledge_chunks
+        # assert self._knowledge_chunks
+
+        assert self._knowledge_chunks is not None
+
         with self._lock:
             self._knowledge_chunks.delete_many({"source_file": source_file})
             docs = [
@@ -1058,7 +1131,10 @@ class MemoryStore:
             docs.sort(key=lambda doc: (doc.get("source_file", ""), doc.get("chunk_index", 0)))
             return [dict(doc) for doc in docs]
 
-        assert self._knowledge_chunks
+        # assert self._knowledge_chunks
+
+        assert self._knowledge_chunks is not None
+
         with self._lock:
             docs = list(
                 self._knowledge_chunks.find().sort(
@@ -1073,7 +1149,10 @@ class MemoryStore:
                 self._knowledge_chunks_ram.pop(source_file, None)
             return
 
-        assert self._knowledge_chunks
+        # assert self._knowledge_chunks
+
+        assert self._knowledge_chunks is not None
+
         with self._lock:
             self._knowledge_chunks.delete_many({"source_file": source_file})
 
@@ -1084,7 +1163,10 @@ class MemoryStore:
                 self._knowledge_chunks_ram.clear()
             return count
 
-        assert self._knowledge_chunks
+        # assert self._knowledge_chunks
+
+        assert self._knowledge_chunks is not None
+
         with self._lock:
             count = self._knowledge_chunks.count_documents({})
             self._knowledge_chunks.drop()
@@ -1102,7 +1184,10 @@ class MemoryStore:
         if self.is_ephemeral:
             raise MemoryDisabledError(MEMORY_DISABLED_MESSAGE)
 
-        assert self._session_attachments
+        # assert self._session_attachments
+
+        assert self._session_attachments is not None
+
         attachment_id = uuid.uuid4().hex[:12]
         now = utc_now()
         doc = {
@@ -1126,7 +1211,10 @@ class MemoryStore:
         if self.is_ephemeral:
             return []
 
-        assert self._session_attachments
+        # assert self._session_attachments
+
+        assert self._session_attachments is not None
+
         with self._lock:
             docs = list(
                 self._session_attachments.find({"session_id": session_id}).sort("created_at", ASCENDING)
@@ -1137,7 +1225,10 @@ class MemoryStore:
         if self.is_ephemeral:
             return None
 
-        assert self._session_attachments and self._session_chunks
+        # assert self._session_attachments and self._session_chunks
+
+        assert self._session_attachments is not None and self._session_chunks is not None
+
         with self._lock:
             doc = self._session_attachments.find_one({"attachment_id": attachment_id})
             if doc is None:
@@ -1152,7 +1243,10 @@ class MemoryStore:
         if self.is_ephemeral:
             raise MemoryDisabledError(MEMORY_DISABLED_MESSAGE)
 
-        assert self._session_chunks
+        # assert self._session_chunks
+
+        assert self._session_chunks is not None
+
         now = utc_now()
         with self._lock:
             docs = [
@@ -1175,7 +1269,10 @@ class MemoryStore:
         if self.is_ephemeral:
             return []
 
-        assert self._session_chunks
+        # assert self._session_chunks
+
+        assert self._session_chunks is not None
+
         with self._lock:
             docs = list(
                 self._session_chunks.find({"session_id": session_id}).sort(
@@ -1190,7 +1287,10 @@ class MemoryStore:
         if self.is_ephemeral:
             return
 
-        assert self._activity
+        # assert self._activity
+
+        assert self._activity is not None
+
         self._activity.insert_one(
             {
                 "activity_id": uuid.uuid4().hex[:8],
@@ -1230,7 +1330,9 @@ class MemoryStore:
             logger.warning("Could not read legacy JSON (%s): %s", json_file, exc)
             return store
 
-        assert store._profile and store._notes and store._tasks and store._activity and store._cache
+        # assert store._profile and store._notes and store._tasks and store._activity and store._cache
+
+        assert store._profile is not None and store._notes is not None and store._tasks is not None and store._activity is not None and store._cache is not None
 
         profile = data.get("profile", {})
         store._profile.update_one(

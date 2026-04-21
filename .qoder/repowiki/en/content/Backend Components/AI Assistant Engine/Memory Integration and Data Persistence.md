@@ -14,15 +14,17 @@
 - [app.js](file://frontend/scripts/app.js)
 - [index.html](file://frontend/index.html)
 - [styles.css](file://frontend/assets/styles.css)
+- [flush_ram.py](file://flush_ram.py)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive memory consent control system with user preference handling
-- Implemented conditional memory operations with explicit error handling when memory is disabled
-- Enhanced frontend UI with memory access controls and user consent management
-- Added ephemeral mode support with memory availability detection
-- Updated server endpoints to respect user memory preferences and storage mode
+- Added comprehensive admin flush endpoint for ephemeral mode memory cleanup
+- Enhanced ephemeral mode client state management with automatic pruning and limits
+- Implemented new `flush_all_ephemeral()` method for memory store cleanup
+- Updated memory store functionality with improved error handling and admin capabilities
+- Added admin token authentication for sensitive memory operations
+- Enhanced memory mode detection and validation throughout the system
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -31,22 +33,24 @@
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
 6. [Memory Consent and User Control System](#memory-consent-and-user-control-system)
-7. [Dependency Analysis](#dependency-analysis)
-8. [Performance Considerations](#performance-considerations)
-9. [Troubleshooting Guide](#troubleshooting-guide)
-10. [Conclusion](#conclusion)
-11. [Appendices](#appendices)
+7. [Admin Management and Memory Cleanup](#admin-management-and-memory-cleanup)
+8. [Dependency Analysis](#dependency-analysis)
+9. [Performance Considerations](#performance-considerations)
+10. [Troubleshooting Guide](#troubleshooting-guide)
+11. [Conclusion](#conclusion)
+12. [Appendices](#appendices)
 
 ## Introduction
-This document explains the memory integration and data persistence mechanisms powering the assistant, with enhanced user-controlled memory access. The system now features comprehensive memory consent controls, conditional memory operations, and user preference handling throughout the architecture. It focuses on how the MemoryStore integrates with MongoDB to persist sessions, messages, profile, tasks, notes, cached weather/news, activity logs, knowledge chunks, and session attachments/chunks, while respecting user preferences for memory access. It also details memory brief generation, state serialization, data retrieval patterns, event logging, memory update triggers, consistency maintenance, and the assistant's conversation context embedding. Practical examples illustrate memory operations, state snapshots, and integration with external services.
+This document explains the memory integration and data persistence mechanisms powering the assistant, with enhanced user-controlled memory access and administrative capabilities. The system now features comprehensive memory consent controls, conditional memory operations, user preference handling, and administrative tools for memory management. It focuses on how the MemoryStore integrates with MongoDB to persist sessions, messages, profile, tasks, notes, cached weather/news, activity logs, knowledge chunks, and session attachments/chunks, while respecting user preferences for memory access. The system also includes enhanced ephemeral mode support with automatic client state pruning, admin flush capabilities, and improved memory store functionality. It details memory brief generation, state serialization, data retrieval patterns, event logging, memory update triggers, consistency maintenance, and the assistant's conversation context embedding. Practical examples illustrate memory operations, state snapshots, and integration with external services.
 
 ## Project Structure
-The memory system spans several modules with enhanced user control:
-- Backend server initializes MemoryStore and exposes REST endpoints for state, sessions, messages, notes, tasks, and attachments, with memory consent validation.
+The memory system spans several modules with enhanced user control and administrative capabilities:
+- Backend server initializes MemoryStore and exposes REST endpoints for state, sessions, messages, notes, tasks, and attachments, with memory consent validation and admin authentication.
 - The brain constructs system instructions with a memory brief and dispatches tool calls that mutate memory, respecting user consent.
 - External services (weather, news) update cached data in memory upon successful retrieval.
-- Configuration controls MongoDB connection and runtime behavior.
+- Configuration controls MongoDB connection, admin token authentication, and runtime behavior.
 - Frontend manages user consent, memory availability detection, and conditional UI interactions.
+- Admin utilities provide memory cleanup capabilities for ephemeral mode deployments.
 
 ```mermaid
 graph TB
@@ -59,6 +63,7 @@ LLM["LLMAssistant<br/>(llm_client.py)"]
 W["WeatherService<br/>(weather.py)"]
 N["NewsService<br/>(news.py)"]
 END["Frontend<br/>(app.js, index.html)"]
+ADMIN["Admin Utilities<br/>(flush_ram.py)"]
 end
 CFG --> SRV
 SRV --> MS
@@ -69,10 +74,12 @@ LLM --> W
 LLM --> N
 END --> SRV
 END --> MS
+ADMIN --> SRV
+ADMIN --> MS
 ```
 
 **Diagram sources**
-- [config.py:55-76](file://backend/config.py#L55-L76)
+- [config.py:55-89](file://backend/config.py#L55-L89)
 - [server.py:23-63](file://backend/server.py#L23-L63)
 - [memory_store.py:67-117](file://backend/core/memory_store.py#L67-L117)
 - [orbit_brain.py:389-502](file://backend/core/orbit_brain.py#L389-L502)
@@ -80,19 +87,21 @@ END --> MS
 - [weather.py:48-76](file://backend/tools/weather.py#L48-L76)
 - [news.py:22-60](file://backend/tools/news.py#L22-L60)
 - [app.js:886-906](file://frontend/scripts/app.js#L886-L906)
+- [flush_ram.py:13-55](file://flush_ram.py#L13-L55)
 
 **Section sources**
 - [README.md:164-201](file://README.md#L164-L201)
-- [config.py:55-76](file://backend/config.py#L55-L76)
+- [config.py:55-89](file://backend/config.py#L55-L89)
 - [server.py:23-63](file://backend/server.py#L23-L63)
 
 ## Core Components
-- MemoryStore: MongoDB-backed persistence for sessions, messages, profile, tasks, notes, activity, cache, knowledge chunks, and session attachments/chunks. Provides legacy compatibility, migration from JSON files, and memory mode detection (persistent vs ephemeral).
+- MemoryStore: MongoDB-backed persistence for sessions, messages, profile, tasks, notes, activity, cache, knowledge chunks, and session attachments/chunks. Provides legacy compatibility, migration from JSON files, memory mode detection (persistent vs ephemeral), and admin cleanup functionality.
 - OrbitBrain: Builds system instructions with a memory brief and dispatches tool calls that mutate memory, with conditional execution based on user consent.
 - LLMAssistant: Orchestrates LLM calls, injects memory brief and conversation snapshot, executes tool calls, and respects memory access preferences.
 - External Services: WeatherService and NewsService update cached data in memory after successful retrieval.
-- Server: Exposes REST endpoints to manage sessions, messages, notes, tasks, attachments, and to trigger chat and tool calls, with memory consent validation.
+- Server: Exposes REST endpoints to manage sessions, messages, notes, tasks, attachments, and to trigger chat and tool calls, with memory consent validation and admin authentication.
 - Frontend: Manages user consent, memory availability detection, and conditional UI interactions based on memory state.
+- Admin Utilities: Provides command-line tools for memory cleanup in ephemeral mode deployments.
 
 **Section sources**
 - [memory_store.py:67-117](file://backend/core/memory_store.py#L67-L117)
@@ -100,9 +109,10 @@ END --> MS
 - [llm_client.py:38-46](file://backend/api_clients/llm_client.py#L38-L46)
 - [server.py:169-501](file://backend/server.py#L169-L501)
 - [app.js:803-884](file://frontend/scripts/app.js#L803-L884)
+- [flush_ram.py:13-55](file://flush_ram.py#L13-L55)
 
 ## Architecture Overview
-The assistant composes a system instruction enriched with a memory brief and a recent conversation snapshot. Tool calls mutate memory and produce events logged in the activity collection, but only when user consent is granted. The server coordinates persistence and retrieval across sessions and messages, respecting memory access preferences and storage mode. The frontend manages user consent and displays appropriate UI states based on memory availability.
+The assistant composes a system instruction enriched with a memory brief and a recent conversation snapshot. Tool calls mutate memory and produce events logged in the activity collection, but only when user consent is granted. The server coordinates persistence and retrieval across sessions and messages, respecting memory access preferences and storage mode. The frontend manages user consent and displays appropriate UI states based on memory availability. Administrative tools provide memory cleanup capabilities for ephemeral mode deployments.
 
 ```mermaid
 sequenceDiagram
@@ -114,6 +124,7 @@ participant LLM as "LLMAssistant"
 participant Store as "MemoryStore"
 participant ExtW as "WeatherService"
 participant ExtN as "NewsService"
+participant Admin as "Admin Utility"
 Client->>Frontend : User interaction
 Frontend->>Server : POST /api/chat (include_memory flag)
 Server->>LLM : chat(message, conversation, session_id, use_memory)
@@ -140,6 +151,10 @@ Store->>Store : append activity record
 end
 LLM-->>Server : reply, tool_events
 Server-->>Client : reply, toolEvents, memory state
+Admin->>Server : POST /api/admin/flush (with admin token)
+Server->>Store : flush_all_ephemeral()
+Store-->>Server : cleanup counts
+Server-->>Admin : success response
 ```
 
 **Diagram sources**
@@ -150,16 +165,19 @@ Server-->>Client : reply, toolEvents, memory state
 - [weather.py:51-76](file://backend/tools/weather.py#L51-L76)
 - [news.py:25-60](file://backend/tools/news.py#L25-L60)
 - [app.js:886-906](file://frontend/scripts/app.js#L886-L906)
+- [server.py:353-364](file://backend/server.py#L353-L364)
+- [memory_store.py:901-921](file://backend/core/memory_store.py#L901-L921)
 
 ## Detailed Component Analysis
 
-### MemoryStore: MongoDB-backed Persistence with Mode Detection
+### MemoryStore: MongoDB-backed Persistence with Enhanced Admin Capabilities
 - Collections: sessions, messages, profile, notes, tasks, activity, cache, knowledge_chunks, session_attachments, session_chunks.
 - Indexes: unique and compound indexes for efficient lookups and sorting.
 - Thread safety: operations are guarded by a lock to prevent concurrent writes.
 - Legacy compatibility: maintains the same public API as the previous JSON-based implementation.
 - Migration: one-time import from legacy JSON files into MongoDB.
-- **Updated**: Mode detection with `is_ephemeral` and `supports_persistent_memory` properties.
+- **Updated**: Enhanced mode detection with `is_ephemeral` and `supports_persistent_memory` properties.
+- **Updated**: Admin cleanup functionality with `flush_all_ephemeral()` method for memory management.
 
 Key capabilities:
 - State retrieval: get_state returns a normalized dictionary mirroring the old JSON structure.
@@ -173,6 +191,7 @@ Key capabilities:
 - Session attachments and chunks: add_session_attachment, get_session_attachments, delete_session_attachment; store_session_chunks, get_session_chunks.
 - Activity logging: _append_activity_record caps entries to a fixed size and trims older records.
 - **New**: Memory mode detection: `is_ephemeral` indicates ephemeral mode, `supports_persistent_memory` indicates MongoDB availability.
+- **New**: Admin cleanup: `flush_all_ephemeral()` clears all ephemeral client data with automatic pruning.
 
 ```mermaid
 classDiagram
@@ -206,6 +225,8 @@ class MemoryStore {
 +delete_session_attachment(attachment_id) dict
 +store_session_chunks(session_id, attachment_id, chunks) int
 +get_session_chunks(session_id) list
++delete_all_sessions(client_id) dict
++flush_all_ephemeral() dict
 +close() void
 +_append_activity_record(kind, payload) void
 +_ensure_indexes() void
@@ -215,7 +236,7 @@ class MemoryStore {
 ```
 
 **Diagram sources**
-- [memory_store.py:67-947](file://backend/core/memory_store.py#L67-L947)
+- [memory_store.py:67-1330](file://backend/core/memory_store.py#L67-L1330)
 
 **Section sources**
 - [memory_store.py:67-117](file://backend/core/memory_store.py#L67-L117)
@@ -231,17 +252,57 @@ class MemoryStore {
 - [memory_store.py:754-797](file://backend/core/memory_store.py#L754-L797)
 - [memory_store.py:802-831](file://backend/core/memory_store.py#L802-L831)
 - [memory_store.py:836-947](file://backend/core/memory_store.py#L836-L947)
+- [memory_store.py:851-899](file://backend/core/memory_store.py#L851-L899)
+- [memory_store.py:901-921](file://backend/core/memory_store.py#L901-L921)
 - [memory_store.py:123-129](file://backend/core/memory_store.py#L123-L129)
+
+### Enhanced Ephemeral Mode Client State Management
+- **New**: Automatic client state pruning with `_MAX_EPHEMERAL_CLIENTS` limit (100 clients).
+- **New**: Client state cleanup with `_prune_ephemeral_clients_locked()` method.
+- **New**: Client state tracking with `EphemeralClientState` dataclass containing sessions, messages, activity, and cache.
+- **New**: Automatic client state cleanup when limits are exceeded.
+- **New**: Client state access validation with `_require_ephemeral_client()` method.
+
+Key features:
+- Client identification: Requires `X-Orbit-Ephemeral-Client` header for all ephemeral operations.
+- State isolation: Each client maintains separate session and message state.
+- Automatic cleanup: Oldest client states are pruned when limits are exceeded.
+- Activity tracking: Ephemeral activity logs are maintained per client.
+
+```mermaid
+flowchart TD
+Start(["Ephemeral Client Access"]) --> CheckHeader{"Has X-Orbit-Ephemeral-Client?"}
+CheckHeader --> |No| Error["Raise MissingEphemeralClientHeaderError"]
+CheckHeader --> |Yes| GetState["_get_ephemeral_client_locked()"]
+GetState --> CheckLimit{"Clients > MAX_LIMIT?"}
+CheckLimit --> |Yes| Prune["_prune_ephemeral_clients_locked()"]
+CheckLimit --> |No| ReturnState["Return Client State"]
+Prune --> ReturnState
+```
+
+**Diagram sources**
+- [memory_store.py:186-190](file://backend/core/memory_store.py#L186-L190)
+- [memory_store.py:226-235](file://backend/core/memory_store.py#L226-L235)
+- [memory_store.py:215-225](file://backend/core/memory_store.py#L215-L225)
+
+**Section sources**
+- [memory_store.py:54-60](file://backend/core/memory_store.py#L54-L60)
+- [memory_store.py:186-190](file://backend/core/memory_store.py#L186-L190)
+- [memory_store.py:215-235](file://backend/core/memory_store.py#L215-L235)
+- [memory_store.py:237-251](file://backend/core/memory_store.py#L237-L251)
 
 ### Memory Brief Generation and State Serialization
 - Memory brief: Built from the current state, including profile, recent notes, open/completed tasks, and cached weather/news. Limits counts for performance and readability.
 - State serialization: get_state returns a dictionary compatible with the legacy JSON structure, enabling seamless integration with existing clients.
 - **Updated**: Conditional state retrieval based on memory access permissions and storage mode.
+- **Updated**: Enhanced ephemeral state handling with client-specific data isolation.
 
 ```mermaid
 flowchart TD
 Start(["get_state()"]) --> CheckMode{"supports_persistent_memory?"}
-CheckMode --> |No| ReturnEmpty["Return empty state"]
+CheckMode --> |No| CheckClient{"Is Ephemeral Mode?"}
+CheckClient --> |Yes| GetEphemeral["_get_ephemeral_client_locked()"]
+CheckClient --> |No| ReturnEmpty["Return empty state"]
 CheckMode --> |Yes| LoadProfile["Load profile document"]
 LoadProfile --> LoadTasks["Load tasks sorted by created_at"]
 LoadTasks --> LoadNotes["Load notes sorted by created_at"]
@@ -249,11 +310,14 @@ LoadNotes --> LoadActivity["Load activity (limited)"]
 LoadActivity --> LoadCache["Load weather and news cache"]
 LoadCache --> BuildBrief["Build brief from state"]
 BuildBrief --> ReturnState["Return state dict"]
+GetEphemeral --> BuildEphemeral["Build ephemeral state"]
+BuildEphemeral --> ReturnState
 ```
 
 **Diagram sources**
 - [memory_store.py:188-250](file://backend/core/memory_store.py#L188-L250)
 - [memory_store.py:256-277](file://backend/core/memory_store.py#L256-L277)
+- [memory_store.py:275-280](file://backend/core/memory_store.py#L275-L280)
 
 **Section sources**
 - [memory_store.py:188-250](file://backend/core/memory_store.py#L188-L250)
@@ -264,6 +328,7 @@ BuildBrief --> ReturnState["Return state dict"]
 - Consistency: All mutations are wrapped in a lock to serialize writes. Indexes optimize reads and enforce uniqueness where needed.
 - Migration: migrate_from_json safely imports legacy JSON data into MongoDB, deduplicating by IDs.
 - **Updated**: Memory mode validation prevents persistent memory operations in ephemeral mode.
+- **Updated**: Enhanced error handling with MemoryDisabledError for admin operations.
 
 ```mermaid
 flowchart TD
@@ -328,6 +393,7 @@ Unlock --> OpEnd["Operation ends"]
 - Legacy history bridge: update_history replaces a session's messages and updates session timestamps.
 - Snapshot construction: build_system_instruction embeds a memory brief and a recent conversation snapshot into the system prompt.
 - **Updated**: Conditional memory brief retrieval based on user consent and storage mode.
+- **Updated**: Enhanced ephemeral message handling with client-specific session isolation.
 
 ```mermaid
 sequenceDiagram
@@ -372,6 +438,7 @@ Brain-->>Brain : build system instruction with brief + snapshot
 - Tools: POST /api/profile, /api/tasks, /api/notes; GET /api/weather, /api/news.
 - Chat: POST /api/chat orchestrates LLM calls and returns memory state alongside replies, with memory consent validation.
 - **Updated**: All endpoints respect memory access permissions and storage mode.
+- **Updated**: Admin endpoints require authentication with admin token validation.
 
 ```mermaid
 flowchart TD
@@ -385,6 +452,7 @@ Route --> |POST /api/tasks| Task["MemoryStore.add_task"]
 Route --> |POST /api/notes| Note["MemoryStore.remember_note"]
 Route --> |GET /api/weather| Wthr["WeatherService.fetch + set_last_weather"]
 Route --> |GET /api/news| News["NewsService.fetch + set_last_news"]
+Route --> |POST /api/admin/flush| Admin["require_admin_token() + flush_all_ephemeral()"]
 State --> Resp["JSON Response"]
 Chat --> Resp
 Prof --> Resp
@@ -392,6 +460,7 @@ Task --> Resp
 Note --> Resp
 Wthr --> Resp
 News --> Resp
+Admin --> Resp
 ```
 
 **Diagram sources**
@@ -399,6 +468,7 @@ News --> Resp
 - [server.py:169-321](file://backend/server.py#L169-L321)
 - [server.py:329-394](file://backend/server.py#L329-L394)
 - [server.py:399-501](file://backend/server.py#L399-L501)
+- [server.py:353-364](file://backend/server.py#L353-L364)
 
 **Section sources**
 - [server.py:106-167](file://backend/server.py#L106-L167)
@@ -476,12 +546,77 @@ Failure --> UpdateUI
 - [server.py:186-203](file://backend/server.py#L186-L203)
 - [orbit_brain.py:440-503](file://backend/core/orbit_brain.py#L440-L503)
 
+## Admin Management and Memory Cleanup
+
+### Admin Authentication System
+The system provides administrative capabilities with secure authentication:
+
+- **Admin Token Configuration**: Configured via `ADMIN_TOKEN` environment variable in `.env`
+- **Header-based Authentication**: Uses `X-Admin-Token` header for all admin operations
+- **Token Validation**: Validates admin token on all admin endpoints
+- **Error Handling**: Returns 403 status for invalid or missing admin tokens
+
+### Admin Flush Endpoint
+The `/api/admin/flush` endpoint provides memory cleanup capabilities:
+
+- **Purpose**: Clears all ephemeral client data in RAM mode
+- **Authentication**: Requires valid admin token
+- **Scope**: Only applicable in ephemeral mode
+- **Response**: Returns cleanup statistics and counts
+
+### Memory Cleanup Process
+The admin flush operation performs the following actions:
+
+- **Mode Validation**: Ensures server is in ephemeral mode
+- **Client Enumeration**: Counts all active ephemeral clients
+- **Data Collection**: Gathers session and message counts per client
+- **Cleanup Execution**: Clears all ephemeral client data
+- **Logging**: Records cleanup activity with counts
+
+### Command-line Admin Utility
+The `flush_ram.py` utility provides a convenient way to trigger memory cleanup:
+
+- **Configuration Loading**: Loads environment variables from `.env`
+- **Token Validation**: Requires `ADMIN_TOKEN` to be configured
+- **HTTP Request**: Sends authenticated POST request to `/api/admin/flush`
+- **Response Processing**: Parses and displays server response
+
+```mermaid
+flowchart TD
+AdminRequest["Admin Request"] --> CheckToken{"Valid Admin Token?"}
+CheckToken --> |No| Return403["Return 403 Forbidden"]
+CheckToken --> |Yes| CheckMode{"Is Ephemeral Mode?"}
+CheckMode --> |No| ReturnNotApplicable["Return Not Applicable"]
+CheckMode --> |Yes| FlushRAM["flush_all_ephemeral()"]
+FlushRAM --> CountClients["Count Clients"]
+CountSessions["Count Sessions"]
+CountMessages["Count Messages"]
+CountClients --> ClearData["Clear All Client Data"]
+CountSessions --> ClearData
+CountMessages --> ClearData
+ClearData --> LogCleanup["Log Cleanup Activity"]
+LogCleanup --> ReturnSuccess["Return Success Response"]
+```
+
+**Diagram sources**
+- [server.py:353-364](file://backend/server.py#L353-L364)
+- [memory_store.py:901-921](file://backend/core/memory_store.py#L901-L921)
+- [flush_ram.py:13-55](file://flush_ram.py#L13-L55)
+
+**Section sources**
+- [server.py:181-189](file://backend/server.py#L181-L189)
+- [server.py:353-364](file://backend/server.py#L353-L364)
+- [memory_store.py:901-921](file://backend/core/memory_store.py#L901-L921)
+- [config.py:81-82](file://backend/config.py#L81-L82)
+- [flush_ram.py:13-55](file://flush_ram.py#L13-L55)
+
 ## Dependency Analysis
 - MemoryStore depends on MongoDB for persistence and PyMongo for connectivity.
 - LLMAssistant depends on MemoryStore, WeatherService, NewsService, and KnowledgeService.
 - Server composes MemoryStore, LLMAssistant, WeatherService, NewsService, and KnowledgeService.
-- Configuration supplies MongoDB URI and database name.
+- Configuration supplies MongoDB URI, database name, and admin token for security.
 - **Updated**: Frontend depends on server for memory availability detection and consent validation.
+- **Updated**: Admin utilities depend on server configuration and admin token authentication.
 
 ```mermaid
 graph LR
@@ -493,21 +628,25 @@ LLM --> W["WeatherService (weather.py)"]
 LLM --> N["NewsService (news.py)"]
 FRONT["Frontend (app.js)"] --> SRV
 FRONT --> MS
+ADMIN["Admin Utility (flush_ram.py)"] --> SRV
+ADMIN --> MS
 ```
 
 **Diagram sources**
-- [config.py:55-76](file://backend/config.py#L55-L76)
+- [config.py:55-89](file://backend/config.py#L55-L89)
 - [server.py:23-63](file://backend/server.py#L23-L63)
 - [llm_client.py:38-46](file://backend/api_clients/llm_client.py#L38-L46)
 - [memory_store.py:67-117](file://backend/core/memory_store.py#L67-L117)
 - [app.js:886-906](file://frontend/scripts/app.js#L886-L906)
+- [flush_ram.py:13-55](file://flush_ram.py#L13-L55)
 
 **Section sources**
-- [config.py:55-76](file://backend/config.py#L55-L76)
+- [config.py:55-89](file://backend/config.py#L55-L89)
 - [server.py:23-63](file://backend/server.py#L23-L63)
 - [llm_client.py:38-46](file://backend/api_clients/llm_client.py#L38-L46)
 - [memory_store.py:67-117](file://backend/core/memory_store.py#L67-L117)
 - [app.js:886-906](file://frontend/scripts/app.js#L886-L906)
+- [flush_ram.py:13-55](file://flush_ram.py#L13-L55)
 
 ## Performance Considerations
 - Indexes: Unique and compound indexes on frequently queried fields improve read/write performance.
@@ -517,6 +656,8 @@ FRONT --> MS
 - Chunking: Knowledge and session chunks are stored separately to enable efficient retrieval and updates.
 - **Updated**: Memory mode optimization: Ephemeral mode reduces overhead by avoiding MongoDB connections.
 - **Updated**: Conditional memory operations: Reduced database calls when memory is disabled.
+- **Updated**: Client state pruning: Automatic cleanup prevents memory leaks in ephemeral mode.
+- **Updated**: Admin cleanup: Efficient bulk operations for memory management.
 
 ## Troubleshooting Guide
 - MongoDB connection failures: MemoryStore raises a runtime error if the server is unreachable; verify URI and network connectivity.
@@ -526,6 +667,8 @@ FRONT --> MS
 - **Updated**: Memory disabled errors: Check `memory_disabled` error code for user consent issues.
 - **Updated**: Ephemeral mode limitations: Some features are intentionally disabled in ephemeral mode.
 - **Updated**: Consent validation: Ensure frontend properly handles memory consent states.
+- **Updated**: Admin token errors: Check `ADMIN_TOKEN` configuration and header authentication.
+- **Updated**: Memory cleanup failures: Verify server is in ephemeral mode before attempting admin flush.
 
 **Section sources**
 - [memory_store.py:86-98](file://backend/core/memory_store.py#L86-L98)
@@ -534,9 +677,10 @@ FRONT --> MS
 - [memory_store.py:475-496](file://backend/core/memory_store.py#L475-L496)
 - [orbit_brain.py:490-493](file://backend/core/orbit_brain.py#L490-L493)
 - [app.js:816-822](file://frontend/scripts/app.js#L816-L822)
+- [server.py:181-189](file://backend/server.py#L181-L189)
 
 ## Conclusion
-The memory integration centers on a robust MemoryStore that persists all assistant state in MongoDB while maintaining backward compatibility and enabling modern features like multi-session chat, file attachments, and RAG. The system now includes comprehensive user-controlled memory access with consent management, conditional memory operations, and graceful degradation when memory is disabled. The system constructs a concise memory brief and a recent conversation snapshot to guide the LLM, logs all significant actions, and integrates external services seamlessly. The enhanced user control system ensures privacy-conscious operation while maintaining full functionality when users choose to enable memory access. Together, these mechanisms deliver a consistent, reliable, extensible, and privacy-respecting memory and persistence layer.
+The memory integration centers on a robust MemoryStore that persists all assistant state in MongoDB while maintaining backward compatibility and enabling modern features like multi-session chat, file attachments, and RAG. The system now includes comprehensive user-controlled memory access with consent management, conditional memory operations, and graceful degradation when memory is disabled. The enhanced ephemeral mode provides automatic client state management with pruning and cleanup capabilities. Administrative tools offer secure memory management for deployment environments. The system constructs a concise memory brief and a recent conversation snapshot to guide the LLM, logs all significant actions, and integrates external services seamlessly. The enhanced user control system ensures privacy-conscious operation while maintaining full functionality when users choose to enable memory access. Together, these mechanisms deliver a consistent, reliable, extensible, and privacy-respecting memory and persistence layer with comprehensive administrative capabilities.
 
 ## Appendices
 
@@ -576,6 +720,18 @@ The memory integration centers on a robust MemoryStore that persists all assista
   - UI adaptation: Frontend enables/disables memory features based on consent
   - Error handling: Frontend displays appropriate messages for disabled operations
 
+- Admin memory cleanup
+  - Admin: Run flush_ram.py with valid ADMIN_TOKEN
+  - Server: Validates admin token and checks ephemeral mode
+  - MemoryStore: flush_all_ephemeral() clears all client data
+  - Response: Returns cleanup statistics and counts
+
+- Ephemeral client state management
+  - Client: Accesses API with X-Orbit-Ephemeral-Client header
+  - MemoryStore: Creates or retrieves client state
+  - Automatic pruning: Removes oldest client when limit exceeded
+  - State isolation: Client data remains separate from others
+
 **Section sources**
 - [server.py:243-253](file://backend/server.py#L243-L253)
 - [server.py:222-241](file://backend/server.py#L222-L241)
@@ -585,3 +741,7 @@ The memory integration centers on a robust MemoryStore that persists all assista
 - [orbit_brain.py:302-357](file://backend/core/orbit_brain.py#L302-L357)
 - [app.js:886-906](file://frontend/scripts/app.js#L886-L906)
 - [app.js:908-937](file://frontend/scripts/app.js#L908-L937)
+- [server.py:353-364](file://backend/server.py#L353-L364)
+- [memory_store.py:901-921](file://backend/core/memory_store.py#L901-L921)
+- [flush_ram.py:13-55](file://flush_ram.py#L13-L55)
+- [memory_store.py:215-235](file://backend/core/memory_store.py#L215-L235)

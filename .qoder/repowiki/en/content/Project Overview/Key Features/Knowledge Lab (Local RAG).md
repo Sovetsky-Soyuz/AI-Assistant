@@ -13,6 +13,15 @@
 - [backend/core/orbit_brain.py](file://backend/core/orbit_brain.py)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Updated supported file formats to include PNG, JPG, and JPEG images
+- Enhanced CLI knowledge builder with improved error handling and verification
+- Added hybrid mode configuration support
+- Improved MongoDB indexing and chunk management
+- Enhanced session document search capabilities
+- Updated tool declarations for better integration
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -26,7 +35,9 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-This document explains the Knowledge Lab’s Local Retrieval-Augmented Generation (RAG) system integrated into the Orbit Virtual Assistant. It covers the LangChain-based document processing pipeline, FAISS vector database integration, BM25 keyword-based retrieval, and the hybrid ensemble approach combining semantic and keyword search. It also documents the document ingestion process, chunking strategies, embedding generation, index building, knowledge base directory structure, supported file formats, preprocessing, practical examples for adding documents and querying knowledge, and how RAG integrates with the main assistant brain system.
+This document explains the Knowledge Lab's Local Retrieval-Augmented Generation (RAG) system integrated into the Orbit Virtual Assistant. It covers the LangChain-based document processing pipeline, FAISS vector database integration, BM25 keyword-based retrieval, and the hybrid ensemble approach combining semantic and keyword search. It also documents the document ingestion process, chunking strategies, embedding generation, index building, knowledge base directory structure, supported file formats, preprocessing, practical examples for adding documents and querying knowledge, and how RAG integrates with the main assistant brain system.
+
+**Updated** Enhanced with new document processing capabilities, improved knowledge base builder tools, and enhanced RAG system performance with expanded file format support and improved CLI functionality.
 
 ## Project Structure
 The Knowledge Lab lives alongside the broader assistant stack. The RAG-related components are primarily under backend/tools/knowledge.py and backend/core/memory_store.py, with a dedicated CLI tool build_knowledge.py for indexing and maintenance. The server initializes the KnowledgeService and exposes search capabilities through the assistant brain.
@@ -82,6 +93,8 @@ MS --> DB
 - MemoryStore: Provides MongoDB-backed persistence for knowledge chunks, session attachments, and session chunks.
 - build_knowledge.py: Standalone CLI to scan, diff, parse, chunk, and index documents into MongoDB; includes verification and dry-run modes.
 - Server and Assistant Brain: Integrate RAG into the assistant runtime, enabling tool-based search of local documents.
+
+**Updated** Enhanced with expanded file format support including images (PNG, JPG, JPEG) and improved CLI functionality with better error handling and verification capabilities.
 
 Key responsibilities:
 - Document ingestion: Supported formats, parsing, chunking, hashing, and storage.
@@ -141,11 +154,13 @@ Server-->>User : reply with tool events
 ## Detailed Component Analysis
 
 ### Document Ingestion and Chunking
-- Supported formats: PDF, DOCX, DOC, TXT, MD, CSV, JSON.
+- Supported formats: PDF, DOCX, DOC, TXT, MD, CSV, JSON, PNG, JPG, JPEG.
 - Parsing: Unstructured loader via LangChain.
 - Chunking: RecursiveCharacterTextSplitter with markdown-aware separators and overlap.
 - Hashing: MD5 computed per file to detect changes.
 - Storage: MongoDB knowledge_chunks collection keyed by source_file and file_hash.
+
+**Updated** Expanded supported formats to include image files (PNG, JPG, JPEG) for enhanced document processing capabilities.
 
 ```mermaid
 flowchart TD
@@ -173,6 +188,8 @@ Store --> Done(["Ready for retrieval"])
   - BM25: from_documents with k=5.
   - FAISS: optional; constructed from_documents with cosine distance; MMR search with fetch_k and lambda_mult.
   - Ensemble: BM25 + FAISS with equal weights; falls back to BM25-only if FAISS fails.
+
+**Updated** Enhanced with improved error handling and fallback mechanisms for FAISS vector store construction.
 
 ```mermaid
 classDiagram
@@ -213,6 +230,8 @@ EnsembleRetriever --> FAISS : "includes"
 - Retrieval: Lazy-built BM25 retriever per session; optional FAISS hybrid if sufficient chunks and embeddings available.
 - Cleanup: On session deletion or attachment removal, retriever cache is invalidated.
 
+**Updated** Enhanced with improved session document handling and hybrid retrieval capabilities for better performance.
+
 ```mermaid
 sequenceDiagram
 participant User as "User"
@@ -249,6 +268,8 @@ KS-->>Server : context blocks
 - Steps: scan directory, compute diffs, remove stale entries, index new/changed files, verify retriever.
 - Verification: constructs BM25 retriever from stored chunks and runs a test query.
 
+**Updated** Enhanced with improved error handling, better progress reporting, and expanded verification capabilities.
+
 ```mermaid
 flowchart TD
 CLI["build_knowledge.py"] --> Mode{"Mode"}
@@ -276,6 +297,8 @@ Test --> End
 ### Relationship Between RAG and the Assistant Brain
 - Tool declarations: search_local_docs and search_session_docs are conditionally included based on RAG availability and session attachments.
 - Execution: run_tool_call routes to KnowledgeService.search or KnowledgeService.search_session and returns results to the assistant.
+
+**Updated** Enhanced tool declarations with improved conditional logic and better integration with hybrid mode configurations.
 
 ```mermaid
 sequenceDiagram
@@ -305,6 +328,8 @@ External libraries and their roles:
 - faiss-cpu: vector similarity search.
 - rank-bm25: BM25 keyword-based retrieval.
 - unstructured: document parsing.
+
+**Updated** Enhanced dependency management with improved version requirements and better error handling.
 
 ```mermaid
 graph TB
@@ -343,7 +368,7 @@ KS --> US
 - Indexing throughput: SpinnerTimer indicates progress; batch insertions for chunks.
 - MongoDB indexing: Compound indexes on knowledge_chunks for efficient retrieval and change detection.
 
-[No sources needed since this section provides general guidance]
+**Updated** Enhanced performance considerations with improved chunk management and better resource utilization.
 
 ## Troubleshooting Guide
 Common issues and remedies:
@@ -353,6 +378,8 @@ Common issues and remedies:
 - Empty knowledge base: Ensure knowledge_base/ exists and contains supported files; use CLI to rebuild or verify.
 - Large files or unsupported types: Upload endpoint enforces allowed types and size limits.
 
+**Updated** Enhanced troubleshooting with better error messages and improved diagnostic capabilities.
+
 **Section sources**
 - [backend/core/memory_store.py:86-98](file://backend/core/memory_store.py#L86-L98)
 - [requirements.txt:19-28](file://requirements.txt#L19-L28)
@@ -360,9 +387,9 @@ Common issues and remedies:
 - [backend/server.py:326-361](file://backend/server.py#L326-L361)
 
 ## Conclusion
-The Knowledge Lab’s Local RAG system integrates seamlessly with the Orbit assistant. It provides robust document ingestion, chunking, and storage, and offers flexible retrieval via BM25 and FAISS, with an ensemble approach for improved precision. The system supports both persistent knowledge base and session-scoped document search, and it is designed to be resilient and easy to operate via CLI and runtime integration.
+The Knowledge Lab's Local RAG system integrates seamlessly with the Orbit assistant. It provides robust document ingestion, chunking, and storage, and offers flexible retrieval via BM25 and FAISS, with an ensemble approach for improved precision. The system supports both persistent knowledge base and session-scoped document search, and it is designed to be resilient and easy to operate via CLI and runtime integration.
 
-[No sources needed since this section summarizes without analyzing specific files]
+**Updated** Enhanced with improved document processing capabilities, better CLI tools, and optimized performance for production use.
 
 ## Appendices
 
@@ -386,6 +413,8 @@ The Knowledge Lab’s Local RAG system integrates seamlessly with the Orbit assi
   - Adjust chunk size and overlap to balance recall and latency.
   - Ensure LM Studio is available for FAISS embeddings to enable hybrid retrieval.
   - Monitor MongoDB indexes and chunk counts; use CLI to rebuild if needed.
+
+**Updated** Enhanced with expanded file format support and improved CLI functionality for better document processing workflows.
 
 **Section sources**
 - [build_knowledge.py:273-428](file://build_knowledge.py#L273-L428)

@@ -26,6 +26,8 @@
 - Added automatic task complexity classification system
 - Integrated Smart Routing toggle in the frontend UI
 - Enhanced LLM client with dynamic routing logic
+- Added new hybrid provider configuration settings
+- Improved memory management with enhanced persistence features
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -169,6 +171,7 @@ Server-->>Client : JSON response
 - **Dynamic Provider Switching**: When routing mode is "dynamic" and hybrid mode is enabled, complex tasks automatically switch from the default provider/model to the hybrid provider/model.
 - **Automatic Model Upgrade**: Complex tasks trigger automatic upgrade to higher-capability models (e.g., GPT-4o) while simple tasks use the default model for cost efficiency.
 - **Fallback Handling**: If hybrid mode is disabled but dynamic routing is requested, the system falls back to using the default provider/model.
+- **Hybrid Configuration**: New hybrid provider settings allow separate configuration of provider and model for complex tasks.
 
 ```mermaid
 flowchart TD
@@ -316,6 +319,7 @@ class MemoryStore {
 - Indexes ensure efficient queries for sessions, messages, and retrievers.
 - Activity records track user actions for auditability.
 - Caches store last weather and news for quick retrieval.
+- **Enhanced Memory Management**: Improved persistence with better state management and memory brief optimization.
 
 ```mermaid
 erDiagram
@@ -533,6 +537,7 @@ Brain --> Tools_News
 - Attachment upload limits: size and type checks prevent oversized or unsupported files.
 - **Smart Hybrid Mode Optimization**: Automatic task complexity classification prevents unnecessary expensive model usage for simple tasks.
 - **Dynamic Routing Efficiency**: Provider switching only occurs for complex tasks, optimizing cost and performance.
+- **Enhanced Memory Management**: Improved state management and memory brief optimization for better performance.
 
 ## Troubleshooting Guide
 - API key missing: provider-specific exceptions raised when API key is absent.
@@ -542,6 +547,7 @@ Brain --> Tools_News
 - Connection failures: MongoDB connection failure raises runtime error with guidance.
 - **Hybrid Mode Issues**: Missing hybrid provider configuration or disabled hybrid mode when dynamic routing is requested.
 - **Task Classification Errors**: Complex keyword detection may need adjustment for specific use cases.
+- **Memory Persistence Issues**: Enhanced error handling for memory store operations and state synchronization.
 
 **Section sources**
 - [backend/api_clients/llm_client.py:60-61](file://backend/api_clients/llm_client.py#L60-L61)
@@ -562,6 +568,7 @@ The Orbit Virtual Assistant engine integrates a flexible provider-agnostic LLM c
 - **Hybrid Provider/Model**: Separate provider and model configuration for complex tasks.
 - **Routing Modes**: Fixed (default) or Dynamic (automatic routing based on task complexity).
 - **Task Classification**: Automatic determination of simple vs complex tasks using keywords and length thresholds.
+- **Configuration Settings**: New hybrid provider settings in config.py with environment variable support.
 
 ### Example Conversation Flows
 - Simple mode: concise answer to a single query; minimal tool usage.
@@ -588,3 +595,7 @@ The Orbit Virtual Assistant engine integrates a flexible provider-agnostic LLM c
   - Extend task complexity classification with additional keywords or criteria.
   - Configure multiple hybrid provider/model combinations for different task types.
   - Implement custom routing logic for specialized use cases.
+- **Enhanced Memory Management**:
+  - Improve state synchronization and memory brief optimization.
+  - Add enhanced error handling for memory operations.
+  - Optimize cache management for better performance.
