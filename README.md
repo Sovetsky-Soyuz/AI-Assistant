@@ -32,6 +32,10 @@ Orbit can "read" your local papers and documents (PDF, DOCX, TXT, CSV) and index
 - **Live Web Search**: Equipped with Tavily (primary) and DuckDuckGo (fallback) to find the latest news, weather, and real-world facts. You can toggle a switch to force all retrieval through web search only.
 - **Weather & News Integration**: Built-in specialized tools to fetch location-specific weather and current news topics.
 
+### Tools-Calling
+- Orbit can add/delete tasks based on User require.
+- Orbit also add note to Memory if required.
+
 ### Screen-Aware Assistance
 Share your screen with Orbit via the browser's native API. Orbit can "see" your current work, explain code, and help you navigate complex user interfaces.
 
