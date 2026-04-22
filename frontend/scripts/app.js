@@ -1049,11 +1049,18 @@ function updateClearAllChatsState() {
   elements.clearAllChatsBtn.disabled = !hasSavedSessions && !hasDraftConversation;
 }
 
+function formatThinkTags(text) {
+  if (!text) return text;
+  return text.replace(/<think>([\s\S]*?)<\/think>/gi, '<details class="think-block"><summary>Thought Process</summary><div class="think-content">$1</div></details>');
+}
+
 // ==========================================
 // THE UI-SIDE "STREAMING" EFFECT FUNCTION
 // ==========================================
 async function streamMarkdown(container, text, speed = 15) {
-  const html = typeof marked !== "undefined" ? marked.parse(text) : text;
+  const processedText = formatThinkTags(text);
+  let html = typeof marked !== "undefined" ? marked.parse(processedText) : processedText;
+  if (typeof DOMPurify !== "undefined") html = DOMPurify.sanitize(html);
   container.innerHTML = "";
 
   const tokens = html.split(/(<[^>]+>)/g);
@@ -1227,10 +1234,20 @@ async function sendPrompt(prompt, options = {}) {
     }
   } catch (error) {
     if (!turn.assistantNode) turn.assistantNode = addMessage("assistant", "");
-    turn.assistantNode.querySelector(".message-body").textContent = `Error: ${error.message}`;
+    const errorBody = turn.assistantNode.querySelector(".message-body");
+    errorBody.textContent = `Error: ${error.message}`;
     turn.assistantNode.classList.add("system");
     appState.conversation.pop();
     setStageState("idle", "Error occurred.");
+
+    const retryBtn = document.createElement("button");
+    retryBtn.className = "retry-btn";
+    retryBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> <span>Retry</span>';
+    retryBtn.addEventListener("click", async () => {
+      turn.assistantNode.remove();
+      await sendPrompt(prompt, options);
+    });
+    errorBody.appendChild(retryBtn);
   } finally {
     appState.currentTurn = null;
     appState.isProcessing = false;
@@ -1250,7 +1267,8 @@ function addMessage(role, text, meta = "", timestamp = null) {
   body.className = "message-body";
 
   if (role === "assistant" && typeof marked !== "undefined" && text !== "") {
-    body.innerHTML = marked.parse(text);
+    let rawHtml = marked.parse(formatThinkTags(text));
+    body.innerHTML = typeof DOMPurify !== "undefined" ? DOMPurify.sanitize(rawHtml) : rawHtml;
     formatLinks(body);
     if (typeof renderMathInElement === "function") {
       renderMathInElement(body, {

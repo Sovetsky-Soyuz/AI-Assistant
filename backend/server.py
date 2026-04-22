@@ -415,6 +415,7 @@ async def handle_chat(payload: ChatRequest) -> dict[str, Any]:
             override_provider=payload.providerOverride,
             override_model=payload.modelOverride,
             use_memory=use_memory,
+            thinking_mode=payload.thinkingMode,
         )
         return {
             "reply": result.reply,

@@ -81,6 +81,7 @@ class LLMAssistant:
         override_provider: str | None = None,
         override_model: str | None = None,
         use_memory: bool = True,
+        thinking_mode: bool = False,
     ) -> AssistantResult:
         
         target_provider = override_provider or self.settings.active_provider
@@ -109,6 +110,7 @@ class LLMAssistant:
             web_search_only=web_search_only,
             offline_mode=offline_mode,
             use_memory=use_memory,
+            thinking_mode=thinking_mode,
         )
 
         if target_provider in ["openrouter", "lm_studio", "ollama"]:

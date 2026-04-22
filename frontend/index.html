@@ -1,114 +1,126 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Orbit Virtual Assistant</title>
-    <!-- <link rel="stylesheet" href="/styles.css" /> -->
-    <link rel="stylesheet" href="/styles.css?v=4" />
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
-    <link rel="stylesheet" href="/styles.css" />
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-    
-  </head>
-  <body>
-    <div class="app-layout" id="appLayout">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orbit Virtual Assistant</title>
+  <link rel="stylesheet" href="/styles.css?v=4" />
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
 
-      <!-- ==================== LEFT SIDEBAR ==================== -->
-      <aside class="sidebar" id="sidebar">
-        <div class="sidebar-top">
-          <div class="sidebar-header">
-            <button class="new-chat-btn" id="newChatBtn" title="New chat">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-              <span>New chat</span>
-            </button>
-            <button class="icon-btn sidebar-collapse-btn" id="sidebarCollapseBtn" title="Close sidebar">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
-            </button>
-          </div>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 
-          <div class="sidebar-utility-row">
-            <button class="sidebar-secondary-btn" id="clearAllChatsBtn" type="button" title="Clear all chats">
-              Clear all
-            </button>
-          </div>
+</head>
 
-          <nav class="session-nav" id="sessionNav">
-            <!-- Pinned chats group -->
-            <div class="session-group" id="pinnedChatsGroup" style="display:none">
-              <p class="session-group-label">Pinned</p>
-              <div id="pinnedChats" class="session-list"></div>
-            </div>
+<body>
+  <div class="app-layout" id="appLayout">
 
-            <!-- Recent chats group -->
-            <div class="session-group">
-              <p class="session-group-label">Recent</p>
-              <div id="recentChats" class="session-list"></div>
-            </div>
-
-            <!-- Archived chats group -->
-            <div class="session-group" id="archivedChatsGroup" style="display:none">
-              <p class="session-group-label archived-label">Archived</p>
-              <div id="archivedChats" class="session-list"></div>
-            </div>
-          </nav>
+    <!-- ==================== LEFT SIDEBAR ==================== -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <div class="sidebar-header">
+          <button class="new-chat-btn" id="newChatBtn" title="New chat">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+            </svg>
+            <span>New chat</span>
+          </button>
+          <button class="icon-btn sidebar-collapse-btn" id="sidebarCollapseBtn" title="Close sidebar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <line x1="9" y1="3" x2="9" y2="21" />
+            </svg>
+          </button>
         </div>
 
-        <div class="sidebar-footer">
-          <div class="sidebar-info-row">
-            <span id="todayLabel" class="sidebar-date">Loading local time...</span>
+        <div class="sidebar-utility-row">
+          <button class="sidebar-secondary-btn" id="clearAllChatsBtn" type="button" title="Clear all chats">
+            Clear all
+          </button>
+        </div>
+
+        <nav class="session-nav" id="sessionNav">
+          <!-- Pinned chats group -->
+          <div class="session-group" id="pinnedChatsGroup" style="display:none">
+            <p class="session-group-label">Pinned</p>
+            <div id="pinnedChats" class="session-list"></div>
           </div>
-          <div class="sidebar-badges">
-            <span class="sidebar-badge" id="apiStatus">Checking API key...</span>
-            <span class="sidebar-badge subtle" id="runtimeBadge">Runtime</span>
+
+          <!-- Recent chats group -->
+          <div class="session-group">
+            <p class="session-group-label">Recent</p>
+            <div id="recentChats" class="session-list"></div>
+          </div>
+
+          <!-- Archived chats group -->
+          <div class="session-group" id="archivedChatsGroup" style="display:none">
+            <p class="session-group-label archived-label">Archived</p>
+            <div id="archivedChats" class="session-list"></div>
+          </div>
+        </nav>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-info-row">
+          <span id="todayLabel" class="sidebar-date">Loading local time...</span>
+        </div>
+        <div class="sidebar-badges">
+          <span class="sidebar-badge" id="apiStatus">Checking API key...</span>
+          <span class="sidebar-badge subtle" id="runtimeBadge">Runtime</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==================== MAIN CHAT AREA ==================== -->
+    <main class="chat-main" id="chatMain">
+
+      <!-- Chat Header -->
+      <header class="chat-header">
+        <div class="header-left">
+          <button class="icon-btn sidebar-open-btn" id="sidebarOpenBtn" title="Open sidebar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+          <span class="header-model" id="modelBadge">Model</span>
+        </div>
+
+        <div class="header-center">
+          <div class="mode-switch">
+            <button class="mode-button active" data-mode="simple">Simple</button>
+            <button class="mode-button" data-mode="copilot">Copilot</button>
+            <button class="mode-button" data-mode="coach">Coach</button>
           </div>
         </div>
-      </aside>
 
-      <!-- ==================== MAIN CHAT AREA ==================== -->
-      <main class="chat-main" id="chatMain">
-
-        <!-- Chat Header -->
-        <header class="chat-header">
-          <div class="header-left">
-            <button class="icon-btn sidebar-open-btn" id="sidebarOpenBtn" title="Open sidebar">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-            </button>
-            <span class="header-model" id="modelBadge">Model</span>
-          </div>
-
-          <div class="header-center">
-            <div class="mode-switch">
-              <button class="mode-button active" data-mode="simple">Simple</button>
-              <button class="mode-button" data-mode="copilot">Copilot</button>
-              <button class="mode-button" data-mode="coach">Coach</button>
-            </div>
-          </div>
-
-          <div class="header-right">
-            <!-- Mini Avatar -->
-            <div class="avatar-mini-wrapper">
-              <div class="avatar-stage" id="avatarStage" data-stage-state="idle">
-                <div class="avatar-aura"></div>
-                <div class="avatar-core">
-                  <div class="avatar-face">
-                    <span class="eye left"></span>
-                    <span class="eye right"></span>
-                    <span class="mouth"></span>
-                  </div>
+        <div class="header-right">
+          <!-- Mini Avatar -->
+          <div class="avatar-mini-wrapper">
+            <div class="avatar-stage" id="avatarStage" data-stage-state="idle">
+              <div class="avatar-aura"></div>
+              <div class="avatar-core">
+                <div class="avatar-face">
+                  <span class="eye left"></span>
+                  <span class="eye right"></span>
+                  <span class="mouth"></span>
                 </div>
-                <div class="avatar-shadow"></div>
               </div>
+              <div class="avatar-shadow"></div>
             </div>
-            <p class="header-stage-status" id="stageStatus">Idle</p>
+          </div>
+          <p class="header-stage-status" id="stageStatus">Idle</p>
 
-            <!-- Current session actions (Pin / Archive / Delete) -->
-            <!-- <div class="header-session-actions">
+          <!-- Current session actions (Pin / Archive / Delete) -->
+          <!-- <div class="header-session-actions">
               <button class="icon-btn" id="pinChatBtn" title="Pin this chat">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V17h14v-1.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V6h1.5a.5.5 0 00.5-.5v-1a.5.5 0 00-.5-.5h-9a.5.5 0 00-.5.5v1a.5.5 0 00.5.5H8a1 1 0 011 1z"/></svg>
               </button>
@@ -119,11 +131,12 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
               </button>
             </div> -->
-            
-            <!-- Current session actions (Pin / Archive / Delete) -->
-            <div class="header-actions-wrapper" style="position: relative;">
+
+          <!-- Current session actions (Pin / Archive / Delete) -->
+          <div class="header-actions-wrapper" style="position: relative;">
             <button class="icon-btn" id="chatSettingsBtn" title="Chat Options">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="1"></circle>
                 <circle cx="12" cy="5" r="1"></circle>
                 <circle cx="12" cy="19" r="1"></circle>
@@ -131,277 +144,364 @@
             </button>
             <div class="dropdown-menu header-dropdown" id="chatSettingsDropdown">
               <button class="dropdown-item" id="renameChatBtn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Rename
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg> Rename
               </button>
               <button class="dropdown-item" id="pinChatBtn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg> Pin chat
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                  <circle cx="12" cy="10" r="3"></circle>
+                </svg> Pin chat
               </button>
               <button class="dropdown-item" id="archiveChatBtn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg> Archive
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                  <rect x="1" y="3" width="22" height="5"></rect>
+                  <line x1="10" y1="12" x2="14" y2="12"></line>
+                </svg> Archive
               </button>
               <div class="dropdown-divider" aria-hidden="true"></div>
               <button class="dropdown-item danger" id="deleteChatBtn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Delete
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg> Delete
               </button>
             </div>
           </div>
 
-            <!-- Utility drawer toggle -->
-            <button class="icon-btn utility-toggle-btn" id="utilityToggleBtn" title="Tools & Settings">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-            </button>
-          </div>
-        </header>
-
-        <!-- Coach Panel (visible only in Coach mode) -->
-        <div id="coachPanel" class="coach-panel hidden">
-          <div class="coach-grid">
-            <label class="coach-field">
-              <span>Learning Topic</span>
-              <input id="coachTopicInput" type="text" placeholder="e.g., Python, Physics, Piano..." />
-            </label>
-            <label class="coach-field">
-              <span>Target Level</span>
-              <input id="coachLevelInput" type="text" placeholder="e.g., Beginner, Pro, Interview Prep..." />
-            </label>
-            <label class="coach-field">
-              <span>Language</span>
-              <select id="conversationLanguageSelect" aria-label="Conversation language"></select>
-            </label>
-          </div>
-          <p class="coach-hint" id="coachModeCopy">
-            Orbit will act as a personal tutor. For best results, enable RAG mode to use your local documents as the textbook.
-          </p>
-        </div>
-
-        <!-- Message Display Area -->
-        <div class="message-frame">
-          <div id="messageList" class="message-list"></div>
-        </div>
-
-        <!-- Tool Events -->
-        <div class="tool-events" id="toolEvents"></div>
-
-        <!-- Composer / Input Area -->
-        <div class="composer-container">
-          <form id="composer" class="composer">
-            <!-- Input toolbar toggles -->
-            <div class="composer-toggles">
-              <button type="button" class="toggle-chip" id="routingToggle" title="Smart Routing: Auto-upgrades model for complex tasks">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-                <span>Smart Routing</span>
-              </button>
-              <button type="button" class="toggle-chip" id="attachFilesBtn" title="Add Photos & Files">
-
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
-                <span>Attach</span>
-              </button>
-              <button type="button" class="toggle-chip" id="createImageBtn" title="Create Image">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                <span>Image</span>
-              </button>
-              <button type="button" class="toggle-chip" id="thinkingToggle" title="Thinking Mode">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.674"/><path d="M12 3a6 6 0 00-3 11.19V17h6v-2.81A6 6 0 0012 3z"/><line x1="9" y1="21" x2="15" y2="21"/></svg>
-                <span>Think</span>
-              </button>
-              <button type="button" class="toggle-chip" id="webSearchToggle" title="Web Search (forces online tools, also uses local data)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
-                <span>Search</span>
-              </button>
-              <button type="button" class="toggle-chip" id="offlineToggle" title="Offline Mode (local knowledge only, no web search)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0119 12.55"/><path d="M5 12.55a10.94 10.94 0 015.17-2.39"/><path d="M10.71 5.05A16 16 0 0122.56 9"/><path d="M1.42 9a15.91 15.91 0 014.7-2.88"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
-                <span>Offline</span>
-              </button>
-            </div>
-
-            <!-- Text input + action buttons -->
-            <div class="composer-input-row">
-              <textarea
-                id="messageInput"
-                rows="1"
-                placeholder="Message Orbit..."
-              ></textarea>
-              <div class="composer-actions">
-                <button type="button" class="composer-mic-btn" id="micButton" title="Hold to talk (Control)">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-                </button>
-                <button type="submit" class="composer-send-btn" id="sendButton" title="Send message">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
-                </button>
-              </div>
-            </div>
-
-            <!-- Composer footer: voice status, screen toggle, shortcuts -->
-            <div class="composer-meta">
-              <span class="voice-status" id="composerVoiceStatus">Voice input idle</span>
-              <label class="screen-attach-label">
-                <input type="checkbox" id="attachScreenToggle" checked />
-                <span>Attach screen</span>
-              </label>
-              <span class="composer-shortcuts">Ctrl+M record &middot; Hold Ctrl talk &middot; Enter send &middot; Shift+Enter new line</span>
-            </div>
-          </form>
-          <p class="composer-disclaimer">Orbit is an AI Assistant and can make mistakes. Consider checking important information.</p>
-        </div>
-      </main>
-
-      <!-- ==================== RIGHT UTILITY DRAWER ==================== -->
-      <aside class="utility-drawer" id="utilityDrawer">
-        <div class="drawer-header">
-          <h2 class="drawer-title">Tools & Settings</h2>
-          <button class="icon-btn" id="utilityCloseBtn" title="Close panel">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <!-- Utility drawer toggle -->
+          <button class="icon-btn utility-toggle-btn" id="utilityToggleBtn" title="Tools & Settings">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+            </svg>
           </button>
         </div>
+      </header>
 
-        <div class="drawer-scroll">
-
-          <!-- Voice Settings -->
-          <section class="drawer-panel">
-            <h3 class="drawer-panel-title">Voice</h3>
-            <div class="drawer-panel-body">
-              <label class="voice-toggle-label">
-                <input type="checkbox" id="voiceToggle" />
-                <span>Read replies aloud</span>
-              </label>
-              <select id="voiceLanguageSelect" class="drawer-select voice-language-select" aria-label="Voice input language" style="margin-bottom: 8px;"></select>
-              <select id="assistantVoiceSelect" class="drawer-select voice-language-select" aria-label="Assistant output voice"></select>
-            </div>
-          </section>
-
-          <!-- Screen Sharing -->
-          <section class="drawer-panel">
-            <div class="drawer-panel-head">
-              <h3 class="drawer-panel-title">Screen Share</h3>
-              <div class="drawer-panel-actions">
-                <button id="startShareButton" class="small-btn">Start</button>
-                <button id="stopShareButton" class="small-btn ghost">Stop</button>
-              </div>
-            </div>
-            <p class="drawer-hint">Orbit can see your screen after browser approval. It cannot control your laptop.</p>
-            <canvas id="screenPreview" width="640" height="360"></canvas>
-          </section>
-
-          <section class="drawer-panel">
-            <div class="drawer-panel-head">
-              <h3 class="drawer-panel-title">Agent Memory</h3>
-              <div class="drawer-panel-actions">
-                <button id="enableMemoryBtn" type="button" class="small-btn ghost">Allow</button>
-                <button id="disableMemoryBtn" type="button" class="small-btn ghost">Disable</button>
-              </div>
-            </div>
-            <p class="drawer-hint" id="memoryConsentStatus">Checking memory preference...</p>
-          </section>
-
-          <!-- Profile -->
-          <section class="drawer-panel" data-memory-gated="true">
-            <h3 class="drawer-panel-title">Profile</h3>
-            <form id="profileForm" class="drawer-form">
-              <input id="displayNameInput" type="text" placeholder="Your name" />
-              <input id="locationInput" type="text" placeholder="City for weather and news" />
-              <input id="routineInput" type="text" placeholder="Short routine note" />
-              <input id="timezoneInput" type="text" placeholder="Timezone (e.g., Asia/Ho_Chi_Minh)" />
-              <input id="dateOfBirthInput" type="date" placeholder="Date of birth" />
-              <input id="occupationInput" type="text" placeholder="Occupation / Role (e.g., Student, Engineer)" />
-              <input id="interestsInput" type="text" placeholder="Interests & Hobbies (e.g., AI, gaming, cooking)" />
-              <select id="preferredToneInput">
-                <option value="">Preferred tone (default)</option>
-                <option value="casual">Casual</option>
-                <option value="professional">Professional</option>
-                <option value="friendly">Friendly</option>
-                <option value="concise">Concise</option>
-              </select>
-              <textarea id="bioInput" rows="2" placeholder="Tell Orbit about yourself..."></textarea>
-              <button type="submit" class="small-btn">Save profile</button>
-            </form>
-          </section>
-
-          <!-- Weather -->
-          <section class="drawer-panel">
-            <div class="drawer-panel-head">
-              <h3 class="drawer-panel-title">Weather</h3>
-              <button id="refreshWeatherButton" class="small-btn ghost">Refresh</button>
-            </div>
-            <div id="weatherCard" class="weather-card">
-              <p class="muted">No weather loaded yet.</p>
-            </div>
-          </section>
-
-          <!-- News -->
-          <section class="drawer-panel">
-            <div class="drawer-panel-head">
-              <h3 class="drawer-panel-title">News</h3>
-              <button id="refreshNewsButton" class="small-btn ghost">Refresh</button>
-            </div>
-            <div id="newsCard" class="news-card">
-              <p class="muted">No news loaded yet.</p>
-            </div>
-          </section>
-
-          <!-- Quick Actions -->
-          <section class="drawer-panel">
-            <h3 class="drawer-panel-title">Quick Actions</h3>
-            <div class="drawer-actions-grid">
-              <button class="ghost-button" data-prompt="Give me a short daily brief using my saved context.">Daily brief</button>
-              <button class="ghost-button" data-prompt="Give me the latest important news headlines right now.">News now</button>
-              <button class="ghost-button" data-prompt="What do you see on my screen, and what should I do next?" data-needs-screen="true">Read my screen</button>
-              <button class="ghost-button" data-prompt="Based on my local papers and files, let's start a personalized lesson on our current topic.">Start Lesson (RAG)</button>
-            </div>
-          </section>
-
-          <!-- Knowledge Lab -->
-          <section class="drawer-panel">
-            <h3 class="drawer-panel-title">Knowledge Lab</h3>
-            <div class="drawer-actions-grid">
-              <button class="ghost-button practice-button" data-prompt="Quiz me on the main concepts found in my local documents.">Local Docs Quiz</button>
-              <button class="ghost-button practice-button" data-prompt="Look at my screen and help me explain the logic of this code or project." data-needs-screen="true">Read & Explain Screen</button>
-              <button class="ghost-button practice-button" data-prompt="Explain the most complex topic in my library like I'm five.">ELI5 Complex Topics</button>
-              <button class="ghost-button practice-button" data-prompt="Create a 7-day study roadmap based on the files in my Knowledge folder.">Generate Roadmap</button>
-            </div>
-          </section>
-
-          <!-- Tasks -->
-          <section class="drawer-panel" data-memory-gated="true">
-            <h3 class="drawer-panel-title">Tasks</h3>
-            <form id="taskForm" class="drawer-form">
-              <input id="taskTitleInput" type="text" placeholder="Add a task" />
-              <div class="task-row">
-                <select id="taskPriorityInput">
-                  <option value="low">Low</option>
-                  <option value="medium" selected>Medium</option>
-                  <option value="high">High</option>
-                </select>
-                <input id="taskDueDateInput" type="text" placeholder="Due date" />
-              </div>
-              <button type="submit" class="small-btn">Add task</button>
-            </form>
-            <div id="taskList" class="task-list"></div>
-          </section>
-
-          <!-- Memory Notes -->
-          <section class="drawer-panel" data-memory-gated="true">
-            <h3 class="drawer-panel-title">Memory</h3>
-            <p class="drawer-hint" id="memoryHint">Recent notes appear when Orbit remembers something for later.</p>
-            <form id="noteForm" class="drawer-form">
-              <input id="noteTextInput" type="text" placeholder="Write a note..." />
-              <div class="task-row">
-                <input id="noteCategoryInput" type="text" placeholder="Category (e.g. habit, reminder)" />
-              </div>
-              <button type="submit" class="small-btn">Add note</button>
-            </form>
-            <div id="notesList" class="notes-list"></div>
-          </section>
-
+      <!-- Coach Panel (visible only in Coach mode) -->
+      <div id="coachPanel" class="coach-panel hidden">
+        <div class="coach-grid">
+          <label class="coach-field">
+            <span>Learning Topic</span>
+            <input id="coachTopicInput" type="text" placeholder="e.g., Python, Physics, Piano..." />
+          </label>
+          <label class="coach-field">
+            <span>Target Level</span>
+            <input id="coachLevelInput" type="text" placeholder="e.g., Beginner, Pro, Interview Prep..." />
+          </label>
+          <label class="coach-field">
+            <span>Language</span>
+            <select id="conversationLanguageSelect" aria-label="Conversation language"></select>
+          </label>
         </div>
-      </aside>
-    </div>
+        <p class="coach-hint" id="coachModeCopy">
+          Orbit will act as a personal tutor. For best results, enable RAG mode to use your local documents as the
+          textbook.
+        </p>
+      </div>
 
-    <!-- Hidden elements required by app.js but not displayed in the new layout -->
-    <p id="stageCopy" hidden></p>
-    <video id="screenVideo" autoplay playsinline hidden></video>
-    <span id="voiceStatus" hidden></span>
-    <input type="file" id="fileAttachInput" accept=".pdf,.docx,.doc,.txt,.md,.csv,.json" multiple hidden />
+      <!-- Message Display Area -->
+      <div class="message-frame">
+        <div id="messageList" class="message-list"></div>
+      </div>
 
-    <script type="module" src="/app.js"></script>
-  </body>
+      <!-- Tool Events -->
+      <div class="tool-events" id="toolEvents"></div>
+
+      <!-- Composer / Input Area -->
+      <div class="composer-container">
+        <form id="composer" class="composer">
+          <!-- Input toolbar toggles -->
+          <div class="composer-toggles">
+            <button type="button" class="toggle-chip" id="routingToggle"
+              title="Smart Routing: Auto-upgrades model for complex tasks">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path
+                  d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                </path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+              </svg>
+              <span>Smart Routing</span>
+            </button>
+            <button type="button" class="toggle-chip" id="attachFilesBtn" title="Add Photos & Files">
+
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path
+                  d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+              </svg>
+              <span>Attach</span>
+            </button>
+            <button type="button" class="toggle-chip" id="createImageBtn" title="Create Image">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <path d="M21 15l-5-5L5 21" />
+              </svg>
+              <span>Image</span>
+            </button>
+            <button type="button" class="toggle-chip" id="thinkingToggle" title="Thinking Mode">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9.663 17h4.674" />
+                <path d="M12 3a6 6 0 00-3 11.19V17h6v-2.81A6 6 0 0012 3z" />
+                <line x1="9" y1="21" x2="15" y2="21" />
+              </svg>
+              <span>Think</span>
+            </button>
+            <button type="button" class="toggle-chip" id="webSearchToggle"
+              title="Web Search (forces online tools, also uses local data)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="2" y1="12" x2="22" y2="12" />
+                <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
+              </svg>
+              <span>Search</span>
+            </button>
+            <button type="button" class="toggle-chip" id="offlineToggle"
+              title="Offline Mode (local knowledge only, no web search)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="1" y1="1" x2="23" y2="23" />
+                <path d="M16.72 11.06A10.94 10.94 0 0119 12.55" />
+                <path d="M5 12.55a10.94 10.94 0 015.17-2.39" />
+                <path d="M10.71 5.05A16 16 0 0122.56 9" />
+                <path d="M1.42 9a15.91 15.91 0 014.7-2.88" />
+                <path d="M8.53 16.11a6 6 0 016.95 0" />
+                <line x1="12" y1="20" x2="12.01" y2="20" />
+              </svg>
+              <span>Offline</span>
+            </button>
+          </div>
+
+          <!-- Text input + action buttons -->
+          <div class="composer-input-row">
+            <textarea id="messageInput" rows="1" placeholder="Message Orbit..."></textarea>
+            <div class="composer-actions">
+              <button type="button" class="composer-mic-btn" id="micButton" title="Hold to talk (Control)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                  <path d="M19 10v2a7 7 0 01-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+              </button>
+              <button type="submit" class="composer-send-btn" id="sendButton" title="Send message">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="19" x2="12" y2="5" />
+                  <polyline points="5 12 12 5 19 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Composer footer: voice status, screen toggle, shortcuts -->
+          <div class="composer-meta">
+            <span class="voice-status" id="composerVoiceStatus">Voice input idle</span>
+            <label class="screen-attach-label">
+              <input type="checkbox" id="attachScreenToggle" checked />
+              <span>Attach screen</span>
+            </label>
+            <span class="composer-shortcuts">Ctrl+M record &middot; Hold Ctrl talk &middot; Enter send &middot;
+              Shift+Enter new line</span>
+          </div>
+        </form>
+        <p class="composer-disclaimer">Orbit is an AI Assistant and can make mistakes. Consider checking important
+          information.</p>
+      </div>
+    </main>
+
+    <!-- ==================== RIGHT UTILITY DRAWER ==================== -->
+    <aside class="utility-drawer" id="utilityDrawer">
+      <div class="drawer-header">
+        <h2 class="drawer-title">Tools & Settings</h2>
+        <button class="icon-btn" id="utilityCloseBtn" title="Close panel">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="drawer-scroll">
+
+        <!-- Voice Settings -->
+        <section class="drawer-panel">
+          <h3 class="drawer-panel-title">Voice</h3>
+          <div class="drawer-panel-body">
+            <label class="voice-toggle-label">
+              <input type="checkbox" id="voiceToggle" />
+              <span>Read replies aloud</span>
+            </label>
+            <select id="voiceLanguageSelect" class="drawer-select voice-language-select"
+              aria-label="Voice input language" style="margin-bottom: 8px;"></select>
+            <select id="assistantVoiceSelect" class="drawer-select voice-language-select"
+              aria-label="Assistant output voice"></select>
+          </div>
+        </section>
+
+        <!-- Screen Sharing -->
+        <section class="drawer-panel">
+          <div class="drawer-panel-head">
+            <h3 class="drawer-panel-title">Screen Share</h3>
+            <div class="drawer-panel-actions">
+              <button id="startShareButton" class="small-btn">Start</button>
+              <button id="stopShareButton" class="small-btn ghost">Stop</button>
+            </div>
+          </div>
+          <p class="drawer-hint">Orbit can see your screen after browser approval. It cannot control your laptop.</p>
+          <canvas id="screenPreview" width="640" height="360"></canvas>
+        </section>
+
+        <section class="drawer-panel">
+          <div class="drawer-panel-head">
+            <h3 class="drawer-panel-title">Agent Memory</h3>
+            <div class="drawer-panel-actions">
+              <button id="enableMemoryBtn" type="button" class="small-btn ghost">Allow</button>
+              <button id="disableMemoryBtn" type="button" class="small-btn ghost">Disable</button>
+            </div>
+          </div>
+          <p class="drawer-hint" id="memoryConsentStatus">Checking memory preference...</p>
+        </section>
+
+        <!-- Profile -->
+        <section class="drawer-panel" data-memory-gated="true">
+          <h3 class="drawer-panel-title">Profile</h3>
+          <form id="profileForm" class="drawer-form">
+            <input id="displayNameInput" type="text" placeholder="Your name" />
+            <input id="locationInput" type="text" placeholder="City for weather and news" />
+            <input id="routineInput" type="text" placeholder="Short routine note" />
+            <input id="timezoneInput" type="text" placeholder="Timezone (e.g., Asia/Ho_Chi_Minh)" />
+            <input id="dateOfBirthInput" type="date" placeholder="Date of birth" />
+            <input id="occupationInput" type="text" placeholder="Occupation / Role (e.g., Student, Engineer)" />
+            <input id="interestsInput" type="text" placeholder="Interests & Hobbies (e.g., AI, gaming, cooking)" />
+            <select id="preferredToneInput">
+              <option value="">Preferred tone (default)</option>
+              <option value="casual">Casual</option>
+              <option value="professional">Professional</option>
+              <option value="friendly">Friendly</option>
+              <option value="concise">Concise</option>
+            </select>
+            <textarea id="bioInput" rows="2" placeholder="Tell Orbit about yourself..."></textarea>
+            <button type="submit" class="small-btn">Save profile</button>
+          </form>
+        </section>
+
+        <!-- Weather -->
+        <section class="drawer-panel">
+          <div class="drawer-panel-head">
+            <h3 class="drawer-panel-title">Weather</h3>
+            <button id="refreshWeatherButton" class="small-btn ghost">Refresh</button>
+          </div>
+          <div id="weatherCard" class="weather-card">
+            <p class="muted">No weather loaded yet.</p>
+          </div>
+        </section>
+
+        <!-- News -->
+        <section class="drawer-panel">
+          <div class="drawer-panel-head">
+            <h3 class="drawer-panel-title">News</h3>
+            <button id="refreshNewsButton" class="small-btn ghost">Refresh</button>
+          </div>
+          <div id="newsCard" class="news-card">
+            <p class="muted">No news loaded yet.</p>
+          </div>
+        </section>
+
+        <!-- Quick Actions -->
+        <section class="drawer-panel">
+          <h3 class="drawer-panel-title">Quick Actions</h3>
+          <div class="drawer-actions-grid">
+            <button class="ghost-button" data-prompt="Give me a short daily brief using my saved context.">Daily
+              brief</button>
+            <button class="ghost-button" data-prompt="Give me the latest important news headlines right now.">News
+              now</button>
+            <button class="ghost-button" data-prompt="What do you see on my screen, and what should I do next?"
+              data-needs-screen="true">Read my screen</button>
+            <button class="ghost-button"
+              data-prompt="Based on my local papers and files, let's start a personalized lesson on our current topic.">Start
+              Lesson (RAG)</button>
+          </div>
+        </section>
+
+        <!-- Knowledge Lab -->
+        <section class="drawer-panel">
+          <h3 class="drawer-panel-title">Knowledge Lab</h3>
+          <div class="drawer-actions-grid">
+            <button class="ghost-button practice-button"
+              data-prompt="Quiz me on the main concepts found in my local documents.">Local Docs Quiz</button>
+            <button class="ghost-button practice-button"
+              data-prompt="Look at my screen and help me explain the logic of this code or project."
+              data-needs-screen="true">Read & Explain Screen</button>
+            <button class="ghost-button practice-button"
+              data-prompt="Explain the most complex topic in my library like I'm five.">ELI5 Complex Topics</button>
+            <button class="ghost-button practice-button"
+              data-prompt="Create a 7-day study roadmap based on the files in my Knowledge folder.">Generate
+              Roadmap</button>
+          </div>
+        </section>
+
+        <!-- Tasks -->
+        <section class="drawer-panel" data-memory-gated="true">
+          <h3 class="drawer-panel-title">Tasks</h3>
+          <form id="taskForm" class="drawer-form">
+            <input id="taskTitleInput" type="text" placeholder="Add a task" />
+            <div class="task-row">
+              <select id="taskPriorityInput">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+              </select>
+              <input id="taskDueDateInput" type="text" placeholder="Due date" />
+            </div>
+            <button type="submit" class="small-btn">Add task</button>
+          </form>
+          <div id="taskList" class="task-list"></div>
+        </section>
+
+        <!-- Memory Notes -->
+        <section class="drawer-panel" data-memory-gated="true">
+          <h3 class="drawer-panel-title">Memory</h3>
+          <p class="drawer-hint" id="memoryHint">Recent notes appear when Orbit remembers something for later.</p>
+          <form id="noteForm" class="drawer-form">
+            <input id="noteTextInput" type="text" placeholder="Write a note..." />
+            <div class="task-row">
+              <input id="noteCategoryInput" type="text" placeholder="Category (e.g. habit, reminder)" />
+            </div>
+            <button type="submit" class="small-btn">Add note</button>
+          </form>
+          <div id="notesList" class="notes-list"></div>
+        </section>
+
+      </div>
+    </aside>
+  </div>
+
+  <!-- Hidden elements required by app.js but not displayed in the new layout -->
+  <p id="stageCopy" hidden></p>
+  <video id="screenVideo" autoplay playsinline hidden></video>
+  <span id="voiceStatus" hidden></span>
+  <input type="file" id="fileAttachInput" accept=".pdf,.docx,.doc,.txt,.md,.csv,.json" multiple hidden />
+
+  <script type="module" src="/app.js"></script>
+</body>
+
 </html>

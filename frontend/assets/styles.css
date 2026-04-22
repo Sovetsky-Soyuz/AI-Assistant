@@ -1142,6 +1142,63 @@ a:hover {
   color: var(--muted);
 }
 
+.think-block {
+  margin: 12px 0;
+  border-left: 3px solid var(--line);
+  padding: 8px 12px;
+  background-color: var(--bg-chat);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 0.9em;
+  font-style: italic;
+}
+
+.think-block summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--ink);
+  outline: none;
+  font-style: normal;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.think-block summary::before {
+  content: '🧠';
+  font-size: 1.1em;
+}
+
+.think-content {
+  margin-top: 8px;
+  white-space: pre-wrap;
+}
+
+.retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-chat);
+  color: var(--ink);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.retry-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.retry-btn svg {
+  flex-shrink: 0;
+}
+
 .drawer-form input,
 .drawer-form select,
 .drawer-form textarea,
