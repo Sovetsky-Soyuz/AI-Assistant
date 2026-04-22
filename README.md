@@ -143,7 +143,6 @@ Orbit_Assistant/
 │   ├── api_clients/                # LLM provider communication
 │   ├── tools/                      # Web search, Knowledge (RAG), News, Weather
 │   ├── core/                       # Brain logic, tool dispatcher, MongoDB MemoryStore
-│   ├── audio/                      # Audio processing capabilities
 │   ├── config.py                   # Settings & .env loader
 │   └── server.py                   # FastAPI endpoints
 ├── frontend/                       # Client-side browser code (HTML/JS/CSS)
