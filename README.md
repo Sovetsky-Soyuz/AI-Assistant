@@ -21,7 +21,7 @@ Orbit includes a specialized "Thinking Mode" toggle. When activated, it forces t
 Orbit can "read" your local papers and documents (PDF, DOCX, TXT, CSV) and index them into MongoDB. It uses LangChain, FAISS, and BM25 ensemble retrieval to provide factual answers strictly based on your private data.
 
 ### Agent Memory: Persistent vs. Ephemeral
-- **MongoDB Mode**: Enjoy persistent multi-session chats with an **unlimited conversation history per session**. It also includes file attachments and a comprehensive memory system that tracks your profile, notes, and tasks across restarts.
+- **MongoDB Mode**: It also includes file attachments and a comprehensive memory system that tracks your profile, notes, and tasks across restarts.
 - **Ephemeral Mode**: Run Orbit in a pure RAM-only state. Perfect for privacy-focused, single-use sessions where no data is left behind after the server shuts down.
 
 ### Security & Stability enhancements
