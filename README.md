@@ -66,25 +66,25 @@ When the active LLM doesn't support a requested feature (e.g., image generation,
 
 Follow these steps to clone the repository and set up your Python environment using Conda:
 
-1. **Clone the repository:**
-   ```bash
-   git clone <your-repository-url>
-   ```
-
-2. **Change directory to the project folder:**
-   ```bash
-   cd AI_Assistant
-   ```
-
-3. **Create a new Conda environment:**
+1. **Create a new Conda environment:**
    This creates an isolated environment named `orbit_env` with Python 3.10.
    ```bash
    conda create -n orbit_env python=3.10
    ```
 
-4. **Activate the new Conda environment:**
+2. **Activate the new Conda environment:**
    ```bash
    conda activate orbit_env
+   ```
+
+3. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Sovetsky-Soyuz/AI-Assistant
+   ```
+
+4. **Change directory to the project folder:**
+   ```bash
+   cd AI_Assistant
    ```
 
 5. **Install project dependencies:**
@@ -104,12 +104,13 @@ OPENROUTER_API_KEY=your_key_here
 TAVILY_API_KEY=your_key_here
 
 # Provider & Model
-ACTIVE_PROVIDER=google
-AI_MODEL=gemini-2.5-flash
+ACTIVE_PROVIDER=openrouter
+GOOGLE_MODEL=gemini-3-flash-preview
+AI_MODEL=openai/gpt-oss-120b:free
 
-# Hybrid Mode (Smart Routing)
+# --- SMART ROUTING (HYBRID) ---
 HYBRID_PROVIDER=openrouter
-HYBRID_MODEL=openai/gpt-4o
+HYBRID_MODEL=qwen/qwen3-coder:free
 
 # Local LLM Configs
 LM_STUDIO_URL=http://127.0.0.1:1234/v1
@@ -121,12 +122,16 @@ LIVE_VOICE_NAME=Nanami
 DEFAULT_LOCATION=Ho Chi Minh City
 
 # RAG Configuration
-RAG_DOCS_PATH=./knowledge_base
+RAG_DOCS_PATH=<PATH_TO_YOUR_DOCUMENTS>
 EMBEDDING_MODEL=text-embedding-bge-m3
 
 # MongoDB Configuration
 MONGODB_URI=mongodb://localhost:27017
 MONGODB_DB=orbit_assistant
+
+# Admin utilities
+ADMIN_TOKEN=<YOUR_PASS> # This pass based on you, feel free to set it ^^
+
 ```
 
 ### 4. Building the Knowledge Base (Optional)
@@ -171,6 +176,20 @@ Finally, open your web browser and navigate to: `http://127.0.0.1:8000`
 
 ---
 
+## Admin Utilities
+
+Orbit includes a utility script to manage the server state externally.
+
+### Flush Ephemeral RAM
+If you are running Orbit in **Ephemeral Mode** (pure RAM, no MongoDB), you can use the `flush_ram.py` utility to immediately wipe all current session data, history, and memory across all connected clients without needing to restart the server. 
+
+```bash
+python flush_ram.py
+```
+*Note: This script makes an authenticated API request and requires `ADMIN_TOKEN` to be configured in your `.env` file. If the server is running in MongoDB mode, this script has no effect on the persistent database and will simply report that it is not applicable.*
+
+---
+
 ## Project Structure
 
 ```text
@@ -186,6 +205,7 @@ Orbit_Assistant/
 ├── knowledge_base/                 # Default directory for local documents
 ├── build_knowledge.py              # CLI tool to index documents (Standard)
 ├── build_knowledge_using_docling.py# CLI tool to index documents (Docling)
+├── flush_ram.py                    # Utility script to clear Ephemeral RAM state
 ├── .env                            # Environment variables
 ├── requirements.txt                # Python dependencies
 └── run.py                          # Entry point

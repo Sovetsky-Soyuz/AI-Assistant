@@ -159,8 +159,6 @@ class MemoryStore:
         if self.is_ephemeral:
             return
 
-        # assert self._profile
-
         assert self._profile is not None
 
         if self._profile.find_one({"_id": "user_profile"}) is None:
@@ -170,9 +168,34 @@ class MemoryStore:
                     "display_name": "",
                     "location": "",
                     "routine": "",
+                    "timezone": "",
+                    "date_of_birth": "",
+                    "occupation": "",
+                    "interests": "",
+                    "preferred_tone": "",
+                    "bio": "",
                     "updated_at": utc_now(),
                 }
             )
+        else:
+            # Ensure new fields exist on legacy profiles
+            self._profile.update_one(
+                {"_id": "user_profile"},
+                {"$setOnInsert": {}},
+            )
+            defaults = {
+                "timezone": "",
+                "date_of_birth": "",
+                "occupation": "",
+                "interests": "",
+                "preferred_tone": "",
+                "bio": "",
+            }
+            for field, default_val in defaults.items():
+                self._profile.update_one(
+                    {"_id": "user_profile", field: {"$exists": False}},
+                    {"$set": {field: default_val}},
+                )
 
     def close(self) -> None:
         if self._client is not None:
@@ -266,6 +289,12 @@ class MemoryStore:
                 "display_name": state["profile"]["display_name"],
                 "location": state["profile"]["location"],
                 "routine": state["profile"]["routine"],
+                "timezone": state["profile"].get("timezone", ""),
+                "date_of_birth": state["profile"].get("date_of_birth", ""),
+                "occupation": state["profile"].get("occupation", ""),
+                "interests": state["profile"].get("interests", ""),
+                "preferred_tone": state["profile"].get("preferred_tone", ""),
+                "bio": state["profile"].get("bio", ""),
             },
             "recent_notes": state["profile"]["notes"][-6:],
             "open_tasks": open_tasks[:8],
@@ -304,6 +333,12 @@ class MemoryStore:
                 "display_name": profile_doc.get("display_name", ""),
                 "location": profile_doc.get("location", ""),
                 "routine": profile_doc.get("routine", ""),
+                "timezone": profile_doc.get("timezone", ""),
+                "date_of_birth": profile_doc.get("date_of_birth", ""),
+                "occupation": profile_doc.get("occupation", ""),
+                "interests": profile_doc.get("interests", ""),
+                "preferred_tone": profile_doc.get("preferred_tone", ""),
+                "bio": profile_doc.get("bio", ""),
                 "notes": [
                     {
                         "id": n.get("note_id", ""),
@@ -349,10 +384,14 @@ class MemoryStore:
         display_name: str | None = None,
         location: str | None = None,
         routine: str | None = None,
+        timezone: str | None = None,
+        date_of_birth: str | None = None,
+        occupation: str | None = None,
+        interests: str | None = None,
+        preferred_tone: str | None = None,
+        bio: str | None = None,
     ) -> dict[str, Any]:
         self._require_persistent_memory()
-
-        # assert self._profile
 
         assert self._profile is not None
 
@@ -363,6 +402,18 @@ class MemoryStore:
             updates["location"] = location.strip()
         if routine is not None:
             updates["routine"] = routine.strip()
+        if timezone is not None:
+            updates["timezone"] = timezone.strip()
+        if date_of_birth is not None:
+            updates["date_of_birth"] = date_of_birth.strip()
+        if occupation is not None:
+            updates["occupation"] = occupation.strip()
+        if interests is not None:
+            updates["interests"] = interests.strip()
+        if preferred_tone is not None:
+            updates["preferred_tone"] = preferred_tone.strip()
+        if bio is not None:
+            updates["bio"] = bio.strip()
 
         with self._lock:
             self._profile.update_one({"_id": "user_profile"}, {"$set": updates})

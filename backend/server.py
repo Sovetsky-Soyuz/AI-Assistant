@@ -66,6 +66,12 @@ class ProfileUpdateRequest(BaseModel):
     displayName: Optional[str] = None
     location: Optional[str] = None
     routine: Optional[str] = None
+    timezone: Optional[str] = None
+    dateOfBirth: Optional[str] = None
+    occupation: Optional[str] = None
+    interests: Optional[str] = None
+    preferredTone: Optional[str] = None
+    bio: Optional[str] = None
 
 
 class TaskCreateRequest(BaseModel):
@@ -304,6 +310,12 @@ async def save_profile(payload: ProfileUpdateRequest) -> dict[str, Any]:
             display_name=payload.displayName,
             location=payload.location,
             routine=payload.routine,
+            timezone=payload.timezone,
+            date_of_birth=payload.dateOfBirth,
+            occupation=payload.occupation,
+            interests=payload.interests,
+            preferred_tone=payload.preferredTone,
+            bio=payload.bio,
         )
         return {"ok": True, "memory": memory_store.get_state()}
     except (KeyError, ValueError) as exc:
@@ -327,6 +339,15 @@ async def create_task(payload: TaskCreateRequest) -> dict[str, Any]:
 async def complete_task(payload: TaskCompleteRequest) -> dict[str, Any]:
     try:
         memory_store.complete_task(payload.taskRef)
+        return {"ok": True, "memory": memory_store.get_state()}
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.delete("/api/tasks/{task_id}")
+async def delete_task(task_id: str) -> dict[str, Any]:
+    try:
+        memory_store.delete_task(task_id)
         return {"ok": True, "memory": memory_store.get_state()}
     except (KeyError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))

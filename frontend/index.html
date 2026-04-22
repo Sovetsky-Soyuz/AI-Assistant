@@ -264,7 +264,8 @@
                 <input type="checkbox" id="voiceToggle" />
                 <span>Read replies aloud</span>
               </label>
-              <select id="voiceLanguageSelect" class="drawer-select voice-language-select" aria-label="Voice input language"></select>
+              <select id="voiceLanguageSelect" class="drawer-select voice-language-select" aria-label="Voice input language" style="margin-bottom: 8px;"></select>
+              <select id="assistantVoiceSelect" class="drawer-select voice-language-select" aria-label="Assistant output voice"></select>
             </div>
           </section>
 
@@ -299,6 +300,18 @@
               <input id="displayNameInput" type="text" placeholder="Your name" />
               <input id="locationInput" type="text" placeholder="City for weather and news" />
               <input id="routineInput" type="text" placeholder="Short routine note" />
+              <input id="timezoneInput" type="text" placeholder="Timezone (e.g., Asia/Ho_Chi_Minh)" />
+              <input id="dateOfBirthInput" type="date" placeholder="Date of birth" />
+              <input id="occupationInput" type="text" placeholder="Occupation / Role (e.g., Student, Engineer)" />
+              <input id="interestsInput" type="text" placeholder="Interests & Hobbies (e.g., AI, gaming, cooking)" />
+              <select id="preferredToneInput">
+                <option value="">Preferred tone (default)</option>
+                <option value="casual">Casual</option>
+                <option value="professional">Professional</option>
+                <option value="friendly">Friendly</option>
+                <option value="concise">Concise</option>
+              </select>
+              <textarea id="bioInput" rows="2" placeholder="Tell Orbit about yourself..."></textarea>
               <button type="submit" class="small-btn">Save profile</button>
             </form>
           </section>

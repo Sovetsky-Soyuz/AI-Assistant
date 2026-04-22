@@ -144,13 +144,19 @@ _FUNCTION_DECLARATIONS = [
     },
     {
         "name": "update_profile",
-        "description": "Save the user's name, location, or routine.",
+        "description": "Save the user's name, location, routine, timezone, date of birth, occupation, interests/hobbies, preferred communication tone, or bio.",
         "parameters": {
             "type": "object",
             "properties": {
                 "display_name": {"type": "string"},
                 "location": {"type": "string"},
                 "routine": {"type": "string"},
+                "timezone": {"type": "string", "description": "IANA timezone like 'Asia/Ho_Chi_Minh' or 'America/New_York'."},
+                "date_of_birth": {"type": "string", "description": "Date of birth in YYYY-MM-DD format."},
+                "occupation": {"type": "string", "description": "The user's job title or role, e.g. 'Software Engineer', 'Student'."},
+                "interests": {"type": "string", "description": "The user's interests or hobbies, comma-separated."},
+                "preferred_tone": {"type": "string", "description": "How the user prefers to be spoken to: casual, professional, friendly, or concise."},
+                "bio": {"type": "string", "description": "A short free-form description about the user."},
             },
         },
     },
@@ -372,8 +378,41 @@ def build_system_instruction(
     language_hint = LANGUAGE_HINTS.get(preferred_language, "")
     language_section = f"\nLanguage preference: {language_hint}" if language_hint else ""
     conversation_snapshot = _build_conversation_snapshot(recent_conversation)
+
+    # --- Personalization section from profile fields ---
+    personalization_lines: list[str] = []
+    if use_memory:
+        try:
+            brief = json.loads(memory_brief) if isinstance(memory_brief, str) and memory_brief.startswith('{') else {}
+            profile = brief.get("profile", {}) if isinstance(brief, dict) else {}
+            if profile.get("occupation"):
+                personalization_lines.append(f"The user's occupation/role is: {profile['occupation']}.")
+            if profile.get("interests"):
+                personalization_lines.append(f"The user's interests/hobbies include: {profile['interests']}.")
+            if profile.get("preferred_tone"):
+                tone = profile["preferred_tone"].lower()
+                tone_map = {
+                    "casual": "Use a relaxed, informal tone. Feel free to use contractions and everyday language.",
+                    "professional": "Use a polished, professional tone. Be structured and precise.",
+                    "friendly": "Be warm, encouraging, and personable. Use a conversational style.",
+                    "concise": "Keep responses short and to the point. Minimize filler words.",
+                }
+                personalization_lines.append(f"Tone preference: {tone_map.get(tone, f'Adapt your tone to be {tone}.')}")
+            if profile.get("bio"):
+                personalization_lines.append(f"About the user: {profile['bio']}")
+            if profile.get("date_of_birth"):
+                personalization_lines.append(f"User's date of birth: {profile['date_of_birth']}.")
+            if profile.get("timezone"):
+                personalization_lines.append(f"User's timezone: {profile['timezone']}.")
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            pass
+
+    personalization_section = ""
+    if personalization_lines:
+        personalization_section = "\nPersonalization context:\n" + "\n".join(f"- {line}" for line in personalization_lines)
+
     return (
-        f"{BASE_PROMPT}\n{mode_prompt}{search_mode_note}{memory_mode_note}\nLocal date and time: {now}{language_section}\n"
+        f"{BASE_PROMPT}\n{mode_prompt}{search_mode_note}{memory_mode_note}\nLocal date and time: {now}{language_section}{personalization_section}\n"
         f"Saved context snapshot: {memory_brief}\nRecent conversation snapshot: {conversation_snapshot}"
     )
 
@@ -459,6 +498,12 @@ def run_tool_call(
                 display_name=args.get("display_name"),
                 location=args.get("location"),
                 routine=args.get("routine"),
+                timezone=args.get("timezone"),
+                date_of_birth=args.get("date_of_birth"),
+                occupation=args.get("occupation"),
+                interests=args.get("interests"),
+                preferred_tone=args.get("preferred_tone"),
+                bio=args.get("bio"),
             )
             result = {"profile_snapshot": updated["profile"]}
             event = {"type": "profile", "label": "Profile updated"}

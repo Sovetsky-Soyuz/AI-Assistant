@@ -1144,6 +1144,7 @@ a:hover {
 
 .drawer-form input,
 .drawer-form select,
+.drawer-form textarea,
 .drawer-select {
   width: 100%;
   padding: 8px 10px;
@@ -1154,8 +1155,15 @@ a:hover {
   color: var(--ink);
 }
 
+.drawer-form textarea {
+  resize: vertical;
+  min-height: 42px;
+  font-family: inherit;
+}
+
 .drawer-form input:focus,
 .drawer-form select:focus,
+.drawer-form textarea:focus,
 .drawer-select:focus {
   outline: none;
   border-color: var(--accent);
@@ -1286,6 +1294,31 @@ a:hover {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+}
+
+.task-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.task-delete-btn {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 2px 7px;
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition);
+}
+
+.task-delete-btn:hover {
+  color: #c0392b;
+  border-color: #c0392b;
 }
 
 .task-title,

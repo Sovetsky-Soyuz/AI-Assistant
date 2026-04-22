@@ -49,14 +49,14 @@ function createEmptyTurn(source = "text") {
 // ---------- Markdown Configuration (FIXED FOR MARKED V13+ & COPY BUTTON) ----------
 if (typeof marked !== "undefined") {
   const renderer = new marked.Renderer();
-  
-  renderer.code = function(tokenOrCode, language) {
+
+  renderer.code = function (tokenOrCode, language) {
     const codeText = typeof tokenOrCode === 'string' ? tokenOrCode : (tokenOrCode.text || "");
     const lang = typeof tokenOrCode === 'string' ? language : (tokenOrCode.lang || "");
-    
+
     const validLang = lang ? `language-${lang}` : '';
     const escapedCode = codeText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    
+
     return `
       <div class="code-block-wrapper">
         <button class="copy-btn" title="Copy code">
@@ -70,7 +70,7 @@ if (typeof marked !== "undefined") {
       </div>
     `;
   };
-  
+
   marked.use({ renderer });
 }
 
@@ -168,6 +168,7 @@ const elements = {
   voiceToggle: document.getElementById("voiceToggle"),
   voiceStatus: document.getElementById("voiceStatus"),
   voiceLanguageSelect: document.getElementById("voiceLanguageSelect"),
+  assistantVoiceSelect: document.getElementById("assistantVoiceSelect"),
   quickActions: Array.from(document.querySelectorAll(".ghost-button[data-prompt]")),
   practiceButtons: Array.from(document.querySelectorAll(".practice-button")),
   screenPreview: document.getElementById("screenPreview"),
@@ -197,6 +198,12 @@ const elements = {
   enableMemoryBtn: document.getElementById("enableMemoryBtn"),
   disableMemoryBtn: document.getElementById("disableMemoryBtn"),
   memoryGatedPanels: Array.from(document.querySelectorAll("[data-memory-gated]")),
+  timezoneInput: document.getElementById("timezoneInput"),
+  dateOfBirthInput: document.getElementById("dateOfBirthInput"),
+  occupationInput: document.getElementById("occupationInput"),
+  interestsInput: document.getElementById("interestsInput"),
+  preferredToneInput: document.getElementById("preferredToneInput"),
+  bioInput: document.getElementById("bioInput"),
 
   chatSettingsBtn: document.getElementById("chatSettingsBtn"),
   chatSettingsDropdown: document.getElementById("chatSettingsDropdown"),
@@ -262,6 +269,33 @@ function initializeFormValues() {
 
   if (elements.coachTopicInput) elements.coachTopicInput.value = appState.coachTopic;
   if (elements.coachLevelInput) elements.coachLevelInput.value = appState.coachLevel;
+
+  if ("speechSynthesis" in window) {
+    populateAssistantVoices();
+    window.speechSynthesis.onvoiceschanged = populateAssistantVoices;
+  }
+}
+
+function populateAssistantVoices() {
+  if (!elements.assistantVoiceSelect) return;
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length === 0) return;
+
+  const savedVoiceURI = window.localStorage.getItem("orbit_assistant_voice") || "";
+  elements.assistantVoiceSelect.innerHTML = "";
+
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "Default Server Voice";
+  elements.assistantVoiceSelect.appendChild(defaultOption);
+
+  voices.forEach((voice) => {
+    const option = document.createElement("option");
+    option.value = voice.voiceURI;
+    option.textContent = `${voice.name} (${voice.lang})`;
+    if (voice.voiceURI === savedVoiceURI) option.selected = true;
+    elements.assistantVoiceSelect.appendChild(option);
+  });
 }
 
 function bindEvents() {
@@ -271,6 +305,11 @@ function bindEvents() {
     setVoiceStatus(`Voice language: ${getSelectedLanguageLabel(elements.voiceLanguageSelect.value)}`);
     if (appState.speechRecognition) appState.speechRecognition.lang = resolveRecognitionLanguage();
   });
+  if (elements.assistantVoiceSelect) {
+    elements.assistantVoiceSelect.addEventListener("change", () => {
+      window.localStorage.setItem("orbit_assistant_voice", elements.assistantVoiceSelect.value);
+    });
+  }
   elements.conversationLanguageSelect.addEventListener("change", () => {
     appState.preferredLanguage = elements.conversationLanguageSelect.value;
     window.localStorage.setItem("orbit_virtual_language", appState.preferredLanguage);
@@ -356,7 +395,7 @@ function bindEvents() {
 
   setupToggleChip(elements.createImageBtn, "imageGenActive");
   setupToggleChip(elements.thinkingToggle, "thinkingActive");
-  if(elements.routingToggle) setupToggleChip(elements.routingToggle, "routingActive");
+  if (elements.routingToggle) setupToggleChip(elements.routingToggle, "routingActive");
 
   elements.webSearchToggle.addEventListener("click", () => {
     appState.webSearchActive = !appState.webSearchActive;
@@ -437,12 +476,15 @@ function bindEvents() {
 
   window.addEventListener("blur", () => {
     if (modeBDelayTimer) { clearTimeout(modeBDelayTimer); modeBDelayTimer = null; }
-    if (appState.hotkeyDown || appState.micHeld) {
-      appState.hotkeyDown = false;
-      appState.micHeld = false;
-      appState.spaceTalking = false;
-      if (!appState.modeAActive) stopVoiceCapture();
+    appState.hotkeyDown = false;
+    appState.micHeld = false;
+    appState.spaceTalking = false;
+    if (appState.modeAActive) {
+      appState.modeAActive = false;
+      setVoiceStatus("Recording cancelled");
+      setStageState("idle", "Idle");
     }
+    stopVoiceCapture();
   });
 
   // Handle copy button clicks
@@ -458,7 +500,7 @@ function bindEvents() {
         span.textContent = "Copied!";
         btn.classList.add("copied");
         setTimeout(() => { span.textContent = "Copy"; btn.classList.remove("copied"); }, 2000);
-      } catch (err) {}
+      } catch (err) { }
     }
   });
 }
@@ -976,6 +1018,12 @@ async function refreshState() {
     elements.displayNameInput.value = data.memory.profile.display_name || "";
     elements.locationInput.value = data.memory.profile.location || data.defaultLocation || "";
     elements.routineInput.value = data.memory.profile.routine || "";
+    elements.timezoneInput.value = data.memory.profile.timezone || "";
+    elements.dateOfBirthInput.value = data.memory.profile.date_of_birth || "";
+    elements.occupationInput.value = data.memory.profile.occupation || "";
+    elements.interestsInput.value = data.memory.profile.interests || "";
+    elements.preferredToneInput.value = data.memory.profile.preferred_tone || "";
+    elements.bioInput.value = data.memory.profile.bio || "";
   }
 
   refreshMemoryViews();
@@ -1007,7 +1055,7 @@ function updateClearAllChatsState() {
 async function streamMarkdown(container, text, speed = 15) {
   const html = typeof marked !== "undefined" ? marked.parse(text) : text;
   container.innerHTML = "";
-  
+
   const tokens = html.split(/(<[^>]+>)/g);
   let currentHTML = "";
 
@@ -1026,7 +1074,7 @@ async function streamMarkdown(container, text, speed = 15) {
       }
     }
   }
-  
+
   container.innerHTML = currentHTML;
   formatLinks(container);
 
@@ -1034,10 +1082,10 @@ async function streamMarkdown(container, text, speed = 15) {
   if (typeof renderMathInElement === "function") {
     renderMathInElement(container, {
       delimiters: [
-        {left: "$$", right: "$$", display: true},
-        {left: "\\[", right: "\\]", display: true},
-        {left: "$", right: "$", display: false},
-        {left: "\\(", right: "\\)", display: false}
+        { left: "$$", right: "$$", display: true },
+        { left: "\\[", right: "\\]", display: true },
+        { left: "$", right: "$", display: false },
+        { left: "\\(", right: "\\)", display: false }
       ],
       throwOnError: false,
       output: "html"
@@ -1099,7 +1147,7 @@ async function sendPrompt(prompt, options = {}) {
     apiFetch(`/api/sessions/${targetSessionId}/messages`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role: "user", text: prompt }),
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   try {
@@ -1135,7 +1183,7 @@ async function sendPrompt(prompt, options = {}) {
     if (!turn.assistantNode) {
       turn.assistantNode = addMessage("assistant", "");
     }
-    
+
     const isRefusal = data.reply.includes("safety and moderation guidelines");
     const isEmpty = data.reply.trim().length === 0;
     const bodyElement = turn.assistantNode.querySelector(".message-body");
@@ -1149,6 +1197,7 @@ async function sendPrompt(prompt, options = {}) {
         bodyElement.textContent = data.reply;
       }
     } else {
+      turn.assistantNode.dataset.rawText = data.reply;
       await streamMarkdown(bodyElement, data.reply);
 
       appState.conversation.push({ role: "assistant", text: data.reply });
@@ -1156,7 +1205,7 @@ async function sendPrompt(prompt, options = {}) {
         apiFetch(`/api/sessions/${targetSessionId}/messages`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ role: "assistant", text: data.reply }),
-        }).catch(() => {});
+        }).catch(() => { });
       }
       await refreshSessions();
     }
@@ -1168,7 +1217,11 @@ async function sendPrompt(prompt, options = {}) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(data.reply);
       const voices = window.speechSynthesis.getVoices();
-      const selectedVoice = voices.find((v) => v.name.toLowerCase().includes(appState.liveVoiceName.toLowerCase()));
+      const savedVoiceURI = window.localStorage.getItem("orbit_assistant_voice") || "";
+      let selectedVoice = voices.find((v) => v.voiceURI === savedVoiceURI);
+      if (!selectedVoice) {
+        selectedVoice = voices.find((v) => v.name.toLowerCase().includes(appState.liveVoiceName.toLowerCase()));
+      }
       if (selectedVoice) { utterance.voice = selectedVoice; utterance.lang = selectedVoice.lang; }
       window.speechSynthesis.speak(utterance);
     }
@@ -1191,6 +1244,7 @@ async function sendPrompt(prompt, options = {}) {
 function addMessage(role, text, meta = "", timestamp = null) {
   const message = document.createElement("article");
   message.className = `message ${role}`;
+  message.dataset.rawText = text || "";
 
   const body = document.createElement("div");
   body.className = "message-body";
@@ -1199,15 +1253,15 @@ function addMessage(role, text, meta = "", timestamp = null) {
     body.innerHTML = marked.parse(text);
     formatLinks(body);
     if (typeof renderMathInElement === "function") {
-        renderMathInElement(body, {
-          delimiters: [
-            {left: "$$", right: "$$", display: true},
-            {left: "\\[", right: "\\]", display: true},
-            {left: "$", right: "$", display: false},
-            {left: "\\(", right: "\\)", display: false}
-          ],
-          throwOnError: false, output: "html"
-        });
+      renderMathInElement(body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "\\[", right: "\\]", display: true },
+          { left: "$", right: "$", display: false },
+          { left: "\\(", right: "\\)", display: false }
+        ],
+        throwOnError: false, output: "html"
+      });
     }
   } else {
     body.textContent = text;
@@ -1229,9 +1283,27 @@ function addMessage(role, text, meta = "", timestamp = null) {
 
   message.append(body, footer);
 
-  if (role === "assistant" || role === "user") {
+  if (role === "assistant") {
     const actions = document.createElement("div");
     actions.className = "message-actions";
+
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "message-action-btn";
+    copyBtn.title = "Copy message";
+    copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span>Copy</span>';
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(message.dataset.rawText || text);
+        const span = copyBtn.querySelector("span");
+        span.textContent = "Copied!";
+        copyBtn.style.color = "var(--accent)";
+        setTimeout(() => {
+          span.textContent = "Copy";
+          copyBtn.style.color = "";
+        }, 2000);
+      } catch (err) { }
+    });
+    actions.appendChild(copyBtn);
 
     const noteBtn = document.createElement("button");
     noteBtn.className = "message-action-btn";
@@ -1465,10 +1537,10 @@ function createSessionItem(session) {
   optionsBtn.className = "session-actions-btn";
   optionsBtn.title = "Options";
   optionsBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
-  
+
   const dropdown = document.createElement("div");
   dropdown.className = "dropdown-menu session-dropdown";
-  
+
   const renameOpt = document.createElement("button");
   renameOpt.className = "dropdown-item";
   renameOpt.innerHTML = getSessionMenuMarkup("rename");
@@ -1513,15 +1585,15 @@ function createSessionItem(session) {
   };
 
   dropdown.append(renameOpt, pinOpt, archiveOpt, divider, deleteOpt);
-  
+
   optionsBtn.onclick = (e) => {
-    e.preventDefault(); 
-    e.stopPropagation(); 
+    e.preventDefault();
+    e.stopPropagation();
     const isOpen = dropdown.classList.contains("show");
     closeAllDropdowns();
-    if (!isOpen) { 
-      dropdown.classList.add("show"); 
-      optionsBtn.classList.add("menu-open"); 
+    if (!isOpen) {
+      dropdown.classList.add("show");
+      optionsBtn.classList.add("menu-open");
     }
   };
 
@@ -1673,9 +1745,13 @@ function renderTasks(tasks) {
     item.className = "task-item";
     item.innerHTML = `
       <div><p class="task-title">${escapeHtml(task.title)}</p><div class="tiny">#${escapeHtml(task.id)} - ${escapeHtml(task.priority)} priority${task.due_date ? ` - due ${escapeHtml(task.due_date)}` : ""}</div></div>
-      <button class="ghost-button">Done</button>
+      <div class="task-actions">
+        <button class="ghost-button task-done-btn">Done</button>
+        <button class="task-delete-btn" title="Delete this task">&times;</button>
+      </div>
     `;
-    item.querySelector("button").addEventListener("click", () => completeTask(task.id));
+    item.querySelector(".task-done-btn").addEventListener("click", () => completeTask(task.id));
+    item.querySelector(".task-delete-btn").addEventListener("click", () => deleteTask(task.id));
     elements.taskList.appendChild(item);
   });
 }
@@ -1711,6 +1787,12 @@ async function saveProfile(event) {
         displayName: elements.displayNameInput.value.trim(),
         location: elements.locationInput.value.trim(),
         routine: elements.routineInput.value.trim(),
+        timezone: elements.timezoneInput.value.trim(),
+        dateOfBirth: elements.dateOfBirthInput.value.trim(),
+        occupation: elements.occupationInput.value.trim(),
+        interests: elements.interestsInput.value.trim(),
+        preferredTone: elements.preferredToneInput.value,
+        bio: elements.bioInput.value.trim(),
       }),
     });
     appState.memory = data.memory || null;
@@ -1789,6 +1871,18 @@ async function completeTask(taskRef) {
     refreshMemoryViews();
   } catch (error) {
     reportActionError(error, "Could not complete task");
+  }
+}
+
+async function deleteTask(taskId) {
+  if (!taskId) return;
+  if (!ensureMemoryEnabled()) return;
+  try {
+    const data = await apiFetch(`/api/tasks/${taskId}`, { method: "DELETE" });
+    appState.memory = data.memory || null;
+    refreshMemoryViews();
+  } catch (error) {
+    reportActionError(error, "Could not delete task");
   }
 }
 
@@ -1932,7 +2026,7 @@ async function startScreenShare() {
     const [track] = stream.getVideoTracks();
     if (track) track.addEventListener("ended", stopScreenShare);
     addMessage("system", "Screen sharing is active. Orbit can now use the latest captured frame when you send a message.");
-  } catch (error) {}
+  } catch (error) { }
 }
 
 function stopScreenShare() {
