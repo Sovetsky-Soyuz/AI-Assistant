@@ -44,6 +44,7 @@ class ChatRequest(BaseModel):
     providerOverride: Optional[str] = None
     modelOverride: Optional[str] = None
     useMemory: Optional[bool] = True
+    thinkingMode: Optional[bool] = False
 
 
 class SessionCreateRequest(BaseModel):
