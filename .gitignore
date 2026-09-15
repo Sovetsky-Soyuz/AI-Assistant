@@ -10,7 +10,7 @@ __pycache__/
 data/*.json
 data/*.json.bak
 data/uploads/
-data/.gitkeep
+!data/.gitkeep
 resume.tex
 online_test.py
 
@@ -21,6 +21,8 @@ knowledge_base/*
 
 # IDE / tool caches
 .idea/
+.qoder/
+.vscode/
 
 # Experimental / legacy code
 RAGChatbot/
