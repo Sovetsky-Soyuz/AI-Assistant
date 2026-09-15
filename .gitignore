@@ -1,5 +1,31 @@
 __pycache__/
 *.py[cod]
+
+# Secrets
 .env
+.env.*
+!.env.example
+
+# Personal data (profile, chat history, uploads, CV)
 data/*.json
-!data/.gitkeep
+data/*.json.bak
+data/uploads/
+data/.gitkeep
+resume.tex
+online_test.py
+
+# Documents (papers, knowledge base files)
+*.pdf
+knowledge_base/*
+!knowledge_base/data
+
+# IDE / tool caches
+.idea/
+
+# Experimental / legacy code
+RAGChatbot/
+Demo/
+assistant_app/
+web/
+Knowledge/
+backend/audio/
