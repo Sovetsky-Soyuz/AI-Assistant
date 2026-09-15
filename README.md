@@ -1,6 +1,6 @@
 # Orbit Virtual Assistant
 
-Orbit is a lightweight, high-performance AI companion designed to run locally on your machine. It functions as a deeply integrated personal assistant that combines a polished web-based interface with a powerful multi-provider backend. Orbit is built to handle everything from casual conversation and web research to complex coding tasks, document analysis (RAG), and proactive planning, all while maintaining a persistent memory of your preferences and ongoing projects.
+Orbit is a lightweight, high-performance AI companion designed to run locally on your machine. It functions as a deeply integrated personal assistant that combines a polished web-based interface with a powerful multi-provider backend. Orbit is built to handle everything from casual conversation and web research to document analysis (RAG), and proactive planning, all while maintaining a persistent memory of your preferences and ongoing projects.
 
 ---
 
