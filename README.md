@@ -162,16 +162,6 @@ This is the advanced indexing script that leverages the Docling library for supe
 
 ---
 
-## Assistant Modes
-
-| Mode              | Description                                                              |
-| :---------------- | :----------------------------------------------------------------------- |
-| **Simple**  | Concise, direct answers. Minimal memory usage.                           |
-| **Copilot** | Proactive planning, screen-aware suggestions, deeper memory utilization. |
-| **Coach**   | Expert tutor mode. Uses RAG to quiz you and generate roadmaps.           |
-
----
-
 ## Project Structure
 
 ```text
